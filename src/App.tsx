@@ -1,5 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './hooks/useAuth';
+import { ToastProvider } from './contexts/ToastContext';
 import Login from './pages/Login.tsx';
 import Signup from './pages/Signup.tsx';
 import Dashboard from './pages/Dashboard.tsx';
@@ -17,20 +19,24 @@ function App() {
   };
 
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<Login onLogin={() => {}} />} />
-        <Route path="/signup" element={<Signup onLogin={() => {}} />} />
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<Dashboard onLogout={handleLogout} />} />
-        <Route path="/vaults" element={<Vaults onLogout={handleLogout} />} />
-        <Route path="/analytics" element={<Analytics onLogout={handleLogout} />} />
-        <Route path="/transactions" element={<Transactions onLogout={handleLogout} />} />
-        <Route path="/trusted-parties" element={<TrustedThirdParties onLogout={handleLogout} />} />
-        <Route path="/notifications" element={<Notifications onLogout={handleLogout} />} />
-        <Route path="/settings" element={<Settings onLogout={handleLogout} />} />
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <ToastProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login onLogin={() => {}} />} />
+            <Route path="/signup" element={<Signup onLogin={() => {}} />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard onLogout={handleLogout} />} />
+            <Route path="/vaults" element={<Vaults onLogout={handleLogout} />} />
+            <Route path="/analytics" element={<Analytics onLogout={handleLogout} />} />
+            <Route path="/transactions" element={<Transactions onLogout={handleLogout} />} />
+            <Route path="/trusted-parties" element={<TrustedThirdParties onLogout={handleLogout} />} />
+            <Route path="/notifications" element={<Notifications onLogout={handleLogout} />} />
+            <Route path="/settings" element={<Settings onLogout={handleLogout} />} />
+          </Routes>
+        </Router>
+      </ToastProvider>
+    </AuthProvider>
   );
 }
 

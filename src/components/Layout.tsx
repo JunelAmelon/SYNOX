@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import { 
   Vault, 
   TrendingUp, 
@@ -22,6 +23,9 @@ interface LayoutProps {
 }
 
 export default function Layout({ children, onLogout }: LayoutProps) {
+  const navigate = useNavigate();
+  const { currentUser, loading, logout } = useAuth();
+  
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('darkMode') === 'true' || 
@@ -31,6 +35,13 @@ export default function Layout({ children, onLogout }: LayoutProps) {
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+
+  // Vérification de l'authentification
+  useEffect(() => {
+    if (!loading && !currentUser) {
+      navigate('/login', { replace: true });
+    }
+  }, [currentUser, loading, navigate]);
 
   // Apply dark mode to document
   React.useEffect(() => {
@@ -42,13 +53,38 @@ export default function Layout({ children, onLogout }: LayoutProps) {
     localStorage.setItem('darkMode', darkMode.toString());
   }, [darkMode]);
 
+  // Gérer la déconnexion
+  const handleLogout = async () => {
+    try {
+      await logout();
+      onLogout();
+      navigate('/login', { replace: true });
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+    }
+  };
+
   const themeClasses = darkMode 
     ? 'dark bg-gray-900 text-white' 
     : 'bg-gray-50 text-gray-900';
 
-  const cardClasses = darkMode 
-    ? 'bg-gray-800 border-gray-700' 
-    : 'bg-white border-gray-200';
+
+  // Afficher un loader pendant la vérification d'authentification
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Vérification de l'authentification...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si pas d'utilisateur connecté, ne pas afficher le layout
+  if (!currentUser) {
+    return null;
+  }
 
   const menuItems = [
     { path: '/dashboard', icon: TrendingUp, label: 'Dashboard' },
@@ -62,28 +98,28 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${themeClasses}`}>
-<header className={`h-24 flex items-center border-b transition-colors duration-300 pl-0 pr-4 sm:pr-6 lg:pr-8 ${
-  darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-}`}>
-  <div className="flex items-center justify-between w-full">
+      <header className={`h-24 flex items-center border-b transition-colors duration-300 pl-0 pr-4 sm:pr-6 lg:pr-8 ${
+        darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      }`}>
+        <div className="flex items-center justify-between w-full">
 
-    {/* Logo */}
-    <div className="flex items-center">
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className={`lg:hidden p-2 rounded-lg mr-3 ${
-          darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-        }`}
-      >
-        {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-      </button>
+          {/* Logo */}
+          <div className="flex items-center">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className={`lg:hidden p-2 rounded-lg mr-3 ${
+                darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+              }`}
+            >
+              {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
 
-      <img 
-        src={darkMode ? "/logo-blanc.png" : "/logo-noir.png"} 
-        alt="SYNOX Logo" 
-        className="h-[140px] sm:h-[170px] md:h-[180px] lg:h-[200px] w-auto object-contain"
-      />
-    </div>
+            <img 
+              src={darkMode ? "/logo-blanc.png" : "/logo-noir.png"} 
+              alt="SYNOX Logo" 
+              className="h-[140px] sm:h-[170px] md:h-[180px] lg:h-[200px] w-auto object-contain"
+            />
+          </div>
 
           {/* User Menu */}
           <div className="flex items-center space-x-3">
@@ -118,8 +154,12 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                 <User className="w-5 h-5 text-white" />
               </div>
               <div className="hidden sm:block">
-                <p className="font-poppins font-bold text-sm">Sophie Martin</p>
-                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Membre Premium</p>
+                <p className="font-poppins font-bold text-sm">
+                  {currentUser?.displayName || 'Utilisateur'}
+                </p>
+                <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {currentUser?.emailVerified ? 'Compte vérifié' : 'En attente de vérification'}
+                </p>
               </div>
             </div>
           </div>
@@ -168,7 +208,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
             <div className="mt-8 pt-6 border-t border-gray-300 dark:border-gray-600">
               <button 
-                onClick={onLogout}
+                onClick={handleLogout}
                 className={`w-full flex items-center px-4 py-3 text-left rounded-xl transition-all duration-200 ${
                   darkMode 
                     ? 'text-gray-300 hover:bg-gray-700 hover:text-white' 

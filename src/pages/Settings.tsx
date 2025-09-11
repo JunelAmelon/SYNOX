@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import Layout from '../components/Layout';
+import { useSettings, ProfileData, PasswordChangeData } from '../hooks/useSettings';
+import { useToastContext } from '../contexts/ToastContext';
+
 import { 
   Settings as SettingsIcon,
   User,
@@ -37,6 +40,88 @@ export default function Settings({ onLogout }: SettingsProps) {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
 
+  // Hook pour les paramètres
+  const { 
+    loading, 
+    error, 
+    updateUserProfile, 
+    changePassword, 
+    getCurrentProfile, 
+    validateProfile, 
+    validatePassword, 
+    clearError 
+  } = useSettings();
+
+  // Hook pour les toasts
+  const { success, error: showError, warning } = useToastContext();
+
+  // États pour les formulaires
+  const [profileData, setProfileData] = useState<ProfileData>(() => {
+    const currentProfile = getCurrentProfile();
+    return currentProfile || {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: ''
+    };
+  });
+
+  const [passwordData, setPasswordData] = useState<PasswordChangeData>({
+    currentPassword: '',
+    newPassword: ''
+  });
+
+  // Handlers pour les formulaires
+  const handleProfileChange = (field: keyof ProfileData, value: string) => {
+    setProfileData(prev => ({ ...prev, [field]: value }));
+    // Effacer l'erreur quand l'utilisateur commence à taper
+    if (error) clearError();
+  };
+
+  const handlePasswordChange = (field: keyof PasswordChangeData, value: string) => {
+    setPasswordData(prev => ({ ...prev, [field]: value }));
+    // Effacer l'erreur quand l'utilisateur commence à taper
+    if (error) clearError();
+  };
+
+  const handleProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validation côté client
+    const validationErrors = validateProfile(profileData);
+    if (validationErrors.length > 0) {
+      showError(validationErrors.join(', '));
+      return;
+    }
+
+    try {
+      await updateUserProfile(profileData);
+      success('Profil mis à jour avec succès');
+    } catch {
+      showError(error || 'Erreur lors de la mise à jour du profil');
+    }
+  };
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validation côté client
+    const validationErrors = validatePassword(passwordData);
+    if (validationErrors.length > 0) {
+      showError(validationErrors.join(', '));
+      return;
+    }
+
+    try {
+      await changePassword(passwordData);
+      success('Mot de passe modifié avec succès');
+      // Réinitialiser le formulaire
+      setPasswordData({ currentPassword: '', newPassword: '' });
+    } catch {
+      showError(error || 'Erreur lors du changement de mot de passe');
+    }
+  };
+
   // Listen for dark mode changes
   React.useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -63,18 +148,23 @@ export default function Settings({ onLogout }: SettingsProps) {
     switch (activeTab) {
       case 'profile':
         return (
-          <div className="space-y-6">
+          <form onSubmit={handleProfileSubmit} className="space-y-6">
             <div className="flex items-center space-x-6">
               <div className="relative">
                 <div className="w-24 h-24 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center">
                   <User className="w-12 h-12 text-white" />
                 </div>
-                <button className="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition-colors">
+                <button type="button" className="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition-colors">
                   <Camera className="w-4 h-4" />
                 </button>
               </div>
               <div>
-                <h3 className="font-poly font-bold text-xl">Sophie Martin</h3>
+                <h3 className="font-poly font-bold text-xl">
+                  {profileData.firstName && profileData.lastName 
+                    ? `${profileData.firstName} ${profileData.lastName}` 
+                    : 'Utilisateur'
+                  }
+                </h3>
                 <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Membre Premium</p>
                 <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Membre depuis juin 2024</p>
               </div>
@@ -85,63 +175,77 @@ export default function Settings({ onLogout }: SettingsProps) {
                 <label className="block text-sm font-poly font-semibold mb-2">Prénom</label>
                 <input
                   type="text"
-                  defaultValue="Sophie"
+                  value={profileData.firstName}
+                  onChange={(e) => handleProfileChange('firstName', e.target.value)}
                   className={`w-full px-4 py-3 rounded-xl border transition-colors ${
                     darkMode 
                       ? 'bg-gray-700 border-gray-600 text-white' 
                       : 'bg-white border-stone-200 text-gray-900'
                   }`}
+                  placeholder="Entrez votre prénom"
                 />
               </div>
               <div>
                 <label className="block text-sm font-poly font-semibold mb-2">Nom</label>
                 <input
                   type="text"
-                  defaultValue="Martin"
+                  value={profileData.lastName}
+                  onChange={(e) => handleProfileChange('lastName', e.target.value)}
                   className={`w-full px-4 py-3 rounded-xl border transition-colors ${
                     darkMode 
                       ? 'bg-gray-700 border-gray-600 text-white' 
                       : 'bg-white border-stone-200 text-gray-900'
                   }`}
+                  placeholder="Entrez votre nom"
                 />
               </div>
               <div>
                 <label className="block text-sm font-poly font-semibold mb-2">Email</label>
                 <input
                   type="email"
-                  defaultValue="sophie.martin@email.com"
+                  value={profileData.email}
+                  onChange={(e) => handleProfileChange('email', e.target.value)}
                   className={`w-full px-4 py-3 rounded-xl border transition-colors ${
                     darkMode 
                       ? 'bg-gray-700 border-gray-600 text-white' 
                       : 'bg-white border-stone-200 text-gray-900'
                   }`}
+                  placeholder="Entrez votre email"
                 />
               </div>
               <div>
                 <label className="block text-sm font-poly font-semibold mb-2">Téléphone</label>
                 <input
                   type="tel"
-                  defaultValue="+33 6 12 34 56 78"
+                  value={profileData.phone}
+                  onChange={(e) => handleProfileChange('phone', e.target.value)}
                   className={`w-full px-4 py-3 rounded-xl border transition-colors ${
                     darkMode 
                       ? 'bg-gray-700 border-gray-600 text-white' 
                       : 'bg-white border-stone-200 text-gray-900'
                   }`}
+                  placeholder="Entrez votre numéro de téléphone"
                 />
               </div>
             </div>
 
-            <button className="flex items-center px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poly font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200">
+            <button 
+              type="submit" 
+              disabled={loading}
+              className={`flex items-center px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poly font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200 ${
+                loading ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
               <Save className="w-5 h-5 mr-2" />
-              Sauvegarder les modifications
+              {loading ? 'Sauvegarde...' : 'Sauvegarder les modifications'}
             </button>
-          </div>
+          </form>
         );
 
       case 'security':
         return (
           <div className="space-y-6">
-            <div className={`p-6 rounded-2xl border ${cardClasses}`}>
+            <form onSubmit={handlePasswordSubmit} className={`p-6 rounded-2xl border ${cardClasses}`}>
               <h3 className="font-poly font-bold text-lg mb-4">Changer le mot de passe</h3>
               <div className="space-y-4">
                 <div>
@@ -149,11 +253,14 @@ export default function Settings({ onLogout }: SettingsProps) {
                   <div className="relative">
                     <input
                       type={showCurrentPassword ? 'text' : 'password'}
+                      value={passwordData.currentPassword}
+                      onChange={(e) => handlePasswordChange('currentPassword', e.target.value)}
                       className={`w-full px-4 py-3 pr-12 rounded-xl border transition-colors ${
                         darkMode 
                           ? 'bg-gray-700 border-gray-600 text-white' 
                           : 'bg-white border-stone-200 text-gray-900'
                       }`}
+                      placeholder="Entrez votre mot de passe actuel"
                     />
                     <button
                       type="button"
@@ -169,11 +276,14 @@ export default function Settings({ onLogout }: SettingsProps) {
                   <div className="relative">
                     <input
                       type={showNewPassword ? 'text' : 'password'}
+                      value={passwordData.newPassword}
+                      onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
                       className={`w-full px-4 py-3 pr-12 rounded-xl border transition-colors ${
                         darkMode 
                           ? 'bg-gray-700 border-gray-600 text-white' 
                           : 'bg-white border-stone-200 text-gray-900'
                       }`}
+                      placeholder="Entrez votre nouveau mot de passe"
                     />
                     <button
                       type="button"
@@ -184,11 +294,17 @@ export default function Settings({ onLogout }: SettingsProps) {
                     </button>
                   </div>
                 </div>
-                <button className="px-6 py-3 bg-blue-500 text-white rounded-xl font-poly font-bold hover:bg-blue-600 transition-colors">
-                  Mettre à jour le mot de passe
+                <button 
+                  type="submit" 
+                  disabled={loading}
+                  className={`px-6 py-3 bg-blue-500 text-white rounded-xl font-poly font-bold hover:bg-blue-600 transition-colors ${
+                    loading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {loading ? 'Mise à jour...' : 'Mettre à jour le mot de passe'}
                 </button>
               </div>
-            </div>
+            </form>
 
             <div className={`p-6 rounded-2xl border ${cardClasses}`}>
               <h3 className="font-poly font-bold text-lg mb-4">Authentification à deux facteurs</h3>

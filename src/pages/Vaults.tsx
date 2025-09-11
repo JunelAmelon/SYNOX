@@ -1,32 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import CreateVaultModal from '../components/CreateVaultModal';
+import { useVaults, CreateVaultData } from '../hooks/useVaults';
+import { useAuth } from '../hooks/useAuth';
+import { useToastContext } from '../contexts/ToastContext';
 import { 
-  Vault, 
   Plus, 
-  MoreHorizontal,
-  Car,
-  Plane,
-  Home,
-  GraduationCap,
-  Heart,
-  ShoppingBag,
-  Smartphone,
-  Filter,
-  Search,
-  Lock,
-  Unlock,
-  Target,
-  Calendar,
-  ChevronLeft,
+  Search, 
+  Filter, 
+  MoreVertical, 
+  Lock, 
+  Unlock, 
+  Eye, 
+  EyeOff, 
+  TrendingUp, 
+  Calendar, 
+  DollarSign, 
+  Target, 
+  Car, 
+  Plane, 
+  Home, 
+  GraduationCap, 
+  Heart, 
+  ShoppingBag, 
+  Smartphone, 
+  Vault, 
+  Shield, 
+  ChevronLeft, 
   ChevronRight,
-  Shield,
-  CheckCircle,
-  DollarSign,
   Edit,
-  Trash2,
-  Eye,
-  EyeOff
+  Trash2
 } from 'lucide-react';
 
 interface VaultsProps {
@@ -35,15 +38,25 @@ interface VaultsProps {
 
 export default function Vaults({ onLogout }: VaultsProps) {
   const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark');
-    }
-    return false;
+    return document.documentElement.classList.contains('dark');
   });
-  const [filterStatus, setFilterStatus] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'locked' | 'completed'>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const {
+    loading,
+    error,
+    createVault,
+    deleteVault,
+    lockVault,
+    unlockVault,
+    filterVaults
+  } = useVaults();
+
+  const { success, warning, error: showError } = useToastContext();
   const vaultsPerPage = 3;
 
   // Listen for dark mode changes
@@ -55,118 +68,40 @@ export default function Vaults({ onLogout }: VaultsProps) {
     return () => observer.disconnect();
   }, []);
 
-  const savingsVaults = [
-    { 
-      id: 1,
-      name: 'Coffre Voyage Europe', 
-      current: 2500, 
-      target: 5000, 
-      type: 'travel',
-      status: 'active',
-      monthlyContrib: 250,
-      daysLeft: 180,
-      createdAt: '2024-08-15',
-      isGoalBased: true,
-      isLocked: false,
-      unlockDate: null
-    },
-    { 
-      id: 2,
-      name: 'Coffre Sécurité', 
-      current: 8000, 
-      target: 10000, 
-      type: 'emergency',
-      status: 'locked',
-      monthlyContrib: 400,
-      daysLeft: 60,
-      createdAt: '2024-06-10',
-      isGoalBased: true,
-      isLocked: true,
-      unlockDate: '2025-06-15'
-    },
-    { 
-      id: 3,
-      name: 'Coffre Auto Premium', 
-      current: 1200, 
-      target: 15000, 
-      type: 'car',
-      status: 'active',
-      monthlyContrib: 500,
-      daysLeft: 720,
-      createdAt: '2024-12-01',
-      isGoalBased: true,
-      isLocked: false,
-      unlockDate: null
-    },
-    { 
-      id: 4,
-      name: 'Coffre Maison Familiale', 
-      current: 15000, 
-      target: 50000, 
-      type: 'home',
-      status: 'active',
-      monthlyContrib: 800,
-      daysLeft: 1200,
-      createdAt: '2024-01-20',
-      isGoalBased: true,
-      isLocked: false,
-      unlockDate: null
-    },
-    { 
-      id: 5,
-      name: 'Coffre Formation Tech', 
-      current: 3500, 
-      target: 3500, 
-      type: 'education',
-      status: 'completed',
-      monthlyContrib: 300,
-      daysLeft: 0,
-      createdAt: '2024-03-15',
-      isGoalBased: true,
-      isLocked: false,
-      unlockDate: null
-    },
-    { 
-      id: 6,
-      name: 'Réserve Personnelle', 
-      current: 4200, 
-      target: null, 
-      type: 'emergency',
-      status: 'active',
-      monthlyContrib: null,
-      daysLeft: null,
-      createdAt: '2024-05-20',
-      isGoalBased: false,
-      isLocked: false,
-      unlockDate: null
-    },
-  ];
+  const filteredVaults = filterVaults(filterStatus, undefined, searchTerm);
 
-  const [vaults, setVaults] = useState(savingsVaults);
-
-  const handleCreateVault = (vaultData: any) => {
-    console.log('Nouveau coffre créé:', vaultData);
+  const handleCreateVault = async (vaultData: CreateVaultData) => {
+    try {
+      await createVault(vaultData);
+      setShowCreateModal(false);
+    } catch (err) {
+      console.error('Erreur lors de la création du coffre:', err);
+    }
   };
 
-  const handleLockVault = (vaultId: number) => {
-    setVaults(prevVaults => 
-      prevVaults.map(vault => 
-        vault.id === vaultId 
-          ? { ...vault, isLocked: true, status: 'locked', unlockDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] }
-          : vault
-      )
-    );
-    setOpenMenuId(null);
+  const handleLockVault = async (vaultId: string) => {
+    try {
+      await lockVault(vaultId);
+      setOpenMenuId(null);
+    } catch (err) {
+      console.error('Erreur lors du verrouillage:', err);
+    }
   };
 
-  const handleEditVault = (vaultId: number) => {
+  const handleEditVault = (vaultId: string) => {
     console.log('Modifier le coffre:', vaultId);
     setOpenMenuId(null);
   };
 
-  const handleDeleteVault = (vaultId: number) => {
-    console.log('Supprimer le coffre:', vaultId);
-    setOpenMenuId(null);
+  const handleDeleteVault = async (vaultId: string) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce coffre ?')) {
+      try {
+        await deleteVault(vaultId);
+        setOpenMenuId(null);
+      } catch (err) {
+        console.error('Erreur lors de la suppression:', err);
+      }
+    }
   };
 
   const vaultTypes = {
@@ -185,19 +120,36 @@ export default function Vaults({ onLogout }: VaultsProps) {
     ? 'bg-gray-800 border-gray-700' 
     : 'bg-white border-stone-200';
 
-  const filteredVaults = vaults.filter(vault => {
-    if (filterStatus === 'all') return true;
-    return vault.status === filterStatus;
-  });
+  const handleUnlockVault = async (vaultId: string) => {
+    try {
+      await unlockVault(vaultId);
+      setOpenMenuId(null);
+      success('Coffre déverrouillé avec succès !');
+    } catch (err) {
+      if (err instanceof Error) {
+        const errorMessage = err.message;
+        
+        if (errorMessage.startsWith('UNLOCK_DATE_NOT_REACHED:')) {
+          const unlockDate = errorMessage.split(':')[1];
+          warning(`Ce coffre ne peut pas encore être déverrouillé. Date de déverrouillage : ${unlockDate}`, 7000);
+        } else if (errorMessage.startsWith('ALREADY_UNLOCKED:')) {
+          warning('Ce coffre est déjà déverrouillé');
+        } else if (errorMessage.startsWith('FIREBASE_ERROR:')) {
+          showError('Erreur de connexion. Veuillez réessayer plus tard.');
+        } else {
+          showError(errorMessage);
+        }
+      } else {
+        showError('Une erreur inattendue s\'est produite');
+      }
+    }
+  };
 
   // Pagination
   const totalPages = Math.ceil(filteredVaults.length / vaultsPerPage);
   const startIndex = (currentPage - 1) * vaultsPerPage;
   const paginatedVaults = filteredVaults.slice(startIndex, startIndex + vaultsPerPage);
 
-  const goToPage = (page: number) => {
-    setCurrentPage(page);
-  };
 
   const goToPrevious = () => {
     if (currentPage > 1) {
@@ -240,6 +192,8 @@ export default function Vaults({ onLogout }: VaultsProps) {
               <Search className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
               <input
                 type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Rechercher un coffre..."
                 className={`px-4 py-2 rounded-xl border transition-colors ${
                   darkMode 
@@ -265,8 +219,28 @@ export default function Vaults({ onLogout }: VaultsProps) {
           </div>
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className={`p-4 rounded-xl border mb-6 ${
+            darkMode 
+              ? 'bg-red-900/20 border-red-800 text-red-300' 
+              : 'bg-red-50 border-red-200 text-red-700'
+          }`}>
+            <p className="font-semibold">Erreur lors du chargement des coffres:</p>
+            <p className="text-sm mt-1">{error}</p>
+          </div>
+        )}
+
         {/* Vaults Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 mb-8">
+        {!loading && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 mb-8">
           {paginatedVaults.map((vault) => {
             const vaultTypeInfo = vaultTypes[vault.type];
             const VaultIcon = vaultTypeInfo.icon;
@@ -500,14 +474,28 @@ export default function Vaults({ onLogout }: VaultsProps) {
                       </div>
                     </div>
                   )}
+
+                  {/* Bouton de déverrouillage pour coffres verrouillés */}
+                  {vault.isLocked && (
+                    <div className="absolute top-4 right-4 z-10">
+                      <button 
+                        onClick={() => handleUnlockVault(vault.id)}
+                        className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white rounded-full flex items-center justify-center shadow-xl transition-all duration-200 transform hover:scale-110"
+                        title="Déverrouiller le coffre"
+                      >
+                        <Unlock className="w-5 h-5" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
-        </div>
+          </div>
+        )}
 
         {/* Pagination */}
-        {filteredVaults.length > 0 && totalPages > 1 && (
+        {!loading && filteredVaults.length > 0 && totalPages > 1 && (
           <div className="flex items-center justify-between mb-4">
             <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Affichage {startIndex + 1}-{Math.min(startIndex + vaultsPerPage, filteredVaults.length)} sur {filteredVaults.length} coffres
@@ -554,7 +542,7 @@ export default function Vaults({ onLogout }: VaultsProps) {
           </div>
         )}
 
-        {filteredVaults.length === 0 && (
+        {!loading && filteredVaults.length === 0 && (
           <div className={`text-center py-12 rounded-2xl border ${cardClasses}`}>
             <div className="text-6xl mb-4">🏦</div>
             <h3 className="font-poly font-bold text-xl mb-2">Aucun coffre trouvé</h3>

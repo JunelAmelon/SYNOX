@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { X, Car, Plane, Home, GraduationCap, Heart, ShoppingBag, Smartphone, Vault, Target, Calendar, DollarSign, Plus, Save, Users, Check } from 'lucide-react';
+import { useTrustedThirdParties } from '../hooks/useTrustedThirdParties';
+import { CreateVaultData } from '../hooks/useVaults';
 
 interface CreateVaultModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (vaultData: any) => void;
+  onSubmit: (vaultData: CreateVaultData) => void;
   darkMode: boolean;
 }
 
@@ -22,13 +24,18 @@ export default function CreateVaultModal({ isOpen, onClose, onSubmit, darkMode }
     supervisors: [] as string[]
   });
 
-  // Liste des superviseurs disponibles (normalement récupérée depuis l'API)
-  const availableSupervisors = [
-    { id: '1', name: 'Marie Dubois', email: 'marie.dubois@email.com', relationship: 'Famille' },
-    { id: '2', name: 'Jean Martin', email: 'jean.martin@email.com', relationship: 'Conjoint' },
-    { id: '3', name: 'Sophie Leroy', email: 'sophie.leroy@email.com', relationship: 'Ami proche' },
-    { id: '4', name: 'Pierre Moreau', email: 'pierre.moreau@email.com', relationship: 'Conseiller financier' },
-  ];
+  // Récupération des vrais tiers de confiance
+  const { trustedParties, loading: loadingParties } = useTrustedThirdParties();
+  
+  // Filtrer seulement les tiers de confiance actifs
+  const availableSupervisors = trustedParties
+    .filter(party => party.status === 'active')
+    .map(party => ({
+      id: party.id,
+      name: party.name,
+      email: party.email,
+      relationship: party.relationship
+    }));
 
   const vaultTypes = [
     { id: 'travel', icon: Plane, name: 'Voyage', color: 'from-blue-500 to-blue-600', description: 'Vacances et voyages' },
@@ -44,7 +51,22 @@ export default function CreateVaultModal({ isOpen, onClose, onSubmit, darkMode }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    
+    // Convert form data to match CreateVaultData interface
+    const vaultData: CreateVaultData = {
+      name: formData.type === 'other' ? formData.customTypeName : formData.name,
+      type: formData.type as 'travel' | 'car' | 'home' | 'education' | 'health' | 'shopping' | 'tech' | 'emergency' | 'other',
+      target: formData.target ? parseFloat(formData.target) : null,
+      monthlyContrib: formData.monthlyContrib ? parseFloat(formData.monthlyContrib) : null,
+      description: formData.description,
+      isGoalBased: formData.isGoalBased,
+      lockConditions: {
+        lockDuration: parseInt(formData.lockDuration) * 30, // Convert months to days
+        requireThirdPartyApproval: true
+      }
+    };
+    
+    onSubmit(vaultData);
     onClose();
     // Reset form
     setFormData({
@@ -267,41 +289,73 @@ export default function CreateVaultModal({ isOpen, onClose, onSubmit, darkMode }
             <p className={`text-xs mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Sélectionnez exactement 2 personnes qui devront valider vos demandes de retrait d'urgence
             </p>
-            <div className="space-y-3">
-              {availableSupervisors.map((supervisor) => (
-                <div
-                  key={supervisor.id}
-                  onClick={() => toggleSupervisor(supervisor.id)}
-                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
-                    formData.supervisors.includes(supervisor.id)
-                      ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
-                      : darkMode
-                        ? 'border-gray-600 hover:border-gray-500'
-                        : 'border-gray-200 hover:border-gray-300'
-                  }`}
+            {loadingParties ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-500"></div>
+                <span className={`ml-3 text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Chargement des tiers de confiance...
+                </span>
+              </div>
+            ) : availableSupervisors.length === 0 ? (
+              <div className={`p-6 rounded-xl border-2 border-dashed text-center ${
+                darkMode ? 'border-gray-600 bg-gray-800/50' : 'border-gray-300 bg-gray-50'
+              }`}>
+                <Users className={`w-12 h-12 mx-auto mb-3 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`} />
+                <h4 className={`font-poppins font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Aucun tiers de confiance disponible
+                </h4>
+                <p className={`text-sm mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Vous devez d'abord ajouter des tiers de confiance pour créer un coffre.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    // Rediriger vers la page des tiers de confiance
+                    window.location.href = '/trusted-third-parties';
+                  }}
+                  className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-lg font-poppins font-semibold hover:from-amber-500 hover:to-amber-600 transition-all duration-200"
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center">
-                        <span className="text-white font-poppins font-bold text-sm">
-                          {supervisor.name.split(' ').map(n => n[0]).join('')}
-                        </span>
+                  Ajouter des tiers de confiance
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {availableSupervisors.map((supervisor) => (
+                  <div
+                    key={supervisor.id}
+                    onClick={() => toggleSupervisor(supervisor.id)}
+                    className={`p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
+                      formData.supervisors.includes(supervisor.id)
+                        ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                        : darkMode
+                          ? 'border-gray-600 hover:border-gray-500'
+                          : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center">
+                          <span className="text-white font-poppins font-bold text-sm">
+                            {supervisor.name.split(' ').map(n => n[0]).join('')}
+                          </span>
+                        </div>
+                        <div>
+                          <h4 className="font-poppins font-semibold">{supervisor.name}</h4>
+                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {supervisor.relationship} • {supervisor.email}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-poppins font-semibold">{supervisor.name}</h4>
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {supervisor.relationship} • {supervisor.email}
-                        </p>
-                      </div>
+                      {formData.supervisors.includes(supervisor.id) && (
+                        <Check className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                      )}
                     </div>
-                    {formData.supervisors.includes(supervisor.id) && (
-                      <Check className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                    )}
                   </div>
-                </div>
-              ))}
-            </div>
-            {formData.supervisors.length !== 2 && (
+                ))}
+              </div>
+            )}
+            {!loadingParties && availableSupervisors.length > 0 && formData.supervisors.length !== 2 && (
               <p className={`text-xs mt-2 ${darkMode ? 'text-amber-400' : 'text-amber-600'}`}>
                 {formData.supervisors.length === 0 
                   ? 'Veuillez sélectionner 2 superviseurs'
@@ -399,9 +453,9 @@ export default function CreateVaultModal({ isOpen, onClose, onSubmit, darkMode }
             </button>
             <button
               type="submit"
-              disabled={formData.supervisors.length !== 2}
+              disabled={formData.supervisors.length !== 2 || loadingParties || availableSupervisors.length === 0}
               className={`flex items-center px-6 py-3 rounded-xl font-poppins font-bold transition-all duration-200 shadow-lg ${
-                formData.supervisors.length === 2
+                formData.supervisors.length === 2 && !loadingParties && availableSupervisors.length > 0
                   ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-black hover:from-amber-500 hover:to-amber-600 hover:shadow-xl transform hover:scale-105'
                   : 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400'
               }`}

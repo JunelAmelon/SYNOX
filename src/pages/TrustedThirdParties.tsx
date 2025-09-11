@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import Layout from '../components/Layout';
+import TrustedPartyModal from '../components/TrustedPartyModal';
+import { useTrustedThirdParties, CreateTrustedPartyData, UpdateTrustedPartyData, TrustedThirdParty } from '../hooks/useTrustedThirdParties';
 import { 
   Users,
   Plus,
@@ -8,13 +10,16 @@ import {
   XCircle,
   Clock,
   Search,
-  Filter,
   MoreHorizontal,
   User,
   Mail,
   Phone,
   Calendar,
-  AlertTriangle
+  AlertTriangle,
+  Edit,
+  Trash2,
+  UserX,
+  UserCheck
 } from 'lucide-react';
 
 interface TrustedThirdPartiesProps {
@@ -22,6 +27,16 @@ interface TrustedThirdPartiesProps {
 }
 
 export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesProps) {
+  const {
+    createTrustedParty,
+    updateTrustedParty,
+    deleteTrustedParty,
+    revokeAccess,
+    reactivateParty,
+    getStats,
+    filterParties
+  } = useTrustedThirdParties();
+
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return document.documentElement.classList.contains('dark');
@@ -29,6 +44,10 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
     return false;
   });
   const [filterStatus, setFilterStatus] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editingParty, setEditingParty] = useState<TrustedThirdParty | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Listen for dark mode changes
   React.useEffect(() => {
@@ -43,61 +62,46 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
     ? 'bg-gray-800 border-gray-700 text-white' 
     : 'bg-white border-gray-200 text-gray-900';
 
-  const trustedParties = [
-    {
-      id: 1,
-      name: 'Marie Dubois',
-      email: 'marie.dubois@email.com',
-      phone: '+33 6 12 34 56 78',
-      relationship: 'Famille',
-      status: 'active',
-      permissions: ['view_vaults', 'emergency_access'],
-      addedDate: '2024-06-15',
-      lastAccess: '2025-01-10',
-      avatar: 'MD'
-    },
-    {
-      id: 2,
-      name: 'Jean Martin',
-      email: 'jean.martin@email.com',
-      phone: '+33 6 87 65 43 21',
-      relationship: 'Conjoint',
-      status: 'active',
-      permissions: ['view_vaults', 'manage_vaults', 'emergency_access'],
-      addedDate: '2024-08-20',
-      lastAccess: '2025-01-14',
-      avatar: 'JM'
-    },
-    {
-      id: 3,
-      name: 'Sophie Leroy',
-      email: 'sophie.leroy@email.com',
-      phone: '+33 6 45 67 89 12',
-      relationship: 'Ami proche',
-      status: 'pending',
-      permissions: ['view_vaults'],
-      addedDate: '2025-01-12',
-      lastAccess: null,
-      avatar: 'SL'
-    },
-    {
-      id: 4,
-      name: 'Pierre Moreau',
-      email: 'pierre.moreau@email.com',
-      phone: '+33 6 98 76 54 32',
-      relationship: 'Conseiller financier',
-      status: 'inactive',
-      permissions: ['view_analytics'],
-      addedDate: '2024-03-10',
-      lastAccess: '2024-12-20',
-      avatar: 'PM'
-    },
-  ];
+  const stats = getStats();
+  const filteredParties = filterParties(filterStatus, undefined, searchTerm);
 
-  const filteredParties = trustedParties.filter(party => {
-    if (filterStatus === 'all') return true;
-    return party.status === filterStatus;
-  });
+  const handleCreateParty = async (data: CreateTrustedPartyData) => {
+    await createTrustedParty(data);
+    setShowModal(false);
+  };
+
+  const handleUpdateParty = async (data: UpdateTrustedPartyData) => {
+    if (editingParty) {
+      await updateTrustedParty(editingParty.id, data);
+      setEditingParty(null);
+      setShowModal(false);
+    }
+  };
+
+  const handleEditParty = (party: TrustedThirdParty) => {
+    setEditingParty(party);
+    setShowModal(true);
+    setOpenMenuId(null);
+  };
+
+  const handleDeleteParty = async (partyId: string) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce tiers de confiance ?')) {
+      await deleteTrustedParty(partyId);
+      setOpenMenuId(null);
+    }
+  };
+
+  const handleRevokeAccess = async (partyId: string) => {
+    if (window.confirm('Êtes-vous sûr de vouloir révoquer l\'accès de ce tiers de confiance ?')) {
+      await revokeAccess(partyId);
+      setOpenMenuId(null);
+    }
+  };
+
+  const handleReactivateParty = async (partyId: string) => {
+    await reactivateParty(partyId);
+    setOpenMenuId(null);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -152,7 +156,13 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
                 Gérez les personnes autorisées à accéder à vos coffres d'épargne
               </p>
             </div>
-            <button className="flex items-center px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poly font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 mt-4 sm:mt-0">
+            <button 
+              onClick={() => {
+                setEditingParty(null);
+                setShowModal(true);
+              }}
+              className="flex items-center px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poly font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 mt-4 sm:mt-0"
+            >
               <Plus className="w-5 h-5 mr-2" />
               Ajouter un Tiers
             </button>
@@ -164,6 +174,8 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
               <Search className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
               <input
                 type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Rechercher une personne..."
                 className={`px-4 py-2 rounded-xl border transition-colors ${
                   darkMode 
@@ -197,7 +209,7 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
                 <Users className="w-6 h-6 text-white" />
               </div>
             </div>
-            <h3 className="font-poly font-bold text-2xl mb-1">{trustedParties.length}</h3>
+            <h3 className="font-poly font-bold text-2xl mb-1">{stats.totalParties}</h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Total des tiers
             </p>
@@ -210,7 +222,7 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
               </div>
             </div>
             <h3 className="font-poly font-bold text-2xl mb-1">
-              {trustedParties.filter(p => p.status === 'active').length}
+              {stats.activeParties}
             </h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Tiers actifs
@@ -224,7 +236,7 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
               </div>
             </div>
             <h3 className="font-poly font-bold text-2xl mb-1">
-              {trustedParties.filter(p => p.status === 'pending').length}
+              {stats.pendingParties}
             </h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               En attente
@@ -238,7 +250,7 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
               </div>
             </div>
             <h3 className="font-poly font-bold text-2xl mb-1">
-              {trustedParties.filter(p => p.permissions.includes('emergency_access')).length}
+              {stats.emergencyAccessParties}
             </h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Accès d'urgence
@@ -267,11 +279,79 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
                     {getStatusIcon(party.status)}
                     <span>{getStatusText(party.status)}</span>
                   </span>
-                  <button className={`p-2 rounded-lg transition-all duration-200 ${
-                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-stone-100'
-                  }`}>
-                    <MoreHorizontal className="w-5 h-5" />
-                  </button>
+                  <div className="relative">
+                    <button 
+                      onClick={() => setOpenMenuId(openMenuId === party.id ? null : party.id)}
+                      className={`p-2 rounded-lg transition-all duration-200 ${
+                        darkMode ? 'hover:bg-gray-700' : 'hover:bg-stone-100'
+                      }`}
+                    >
+                      <MoreHorizontal className="w-5 h-5" />
+                    </button>
+                    
+                    {/* Menu déroulant */}
+                    {openMenuId === party.id && (
+                      <div className={`absolute right-0 top-12 w-48 rounded-xl shadow-2xl border-2 z-50 ${
+                        darkMode 
+                          ? 'bg-gray-800 border-gray-600' 
+                          : 'bg-white border-gray-200'
+                      }`}>
+                        <div className="p-2">
+                          <button
+                            onClick={() => handleEditParty(party)}
+                            className={`w-full flex items-center px-4 py-3 text-left rounded-lg transition-all duration-200 ${
+                              darkMode 
+                                ? 'text-gray-300 hover:bg-gray-700 hover:text-white' 
+                                : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                            }`}
+                          >
+                            <Edit className="w-4 h-4 mr-3" />
+                            Modifier
+                          </button>
+                          
+                          {party.status === 'active' ? (
+                            <button
+                              onClick={() => handleRevokeAccess(party.id)}
+                              className={`w-full flex items-center px-4 py-3 text-left rounded-lg transition-all duration-200 ${
+                                darkMode 
+                                  ? 'text-orange-400 hover:bg-orange-900/20 hover:text-orange-300' 
+                                  : 'text-orange-600 hover:bg-orange-50 hover:text-orange-700'
+                              }`}
+                            >
+                              <UserX className="w-4 h-4 mr-3" />
+                              Révoquer l'accès
+                            </button>
+                          ) : party.status === 'inactive' || party.status === 'revoked' ? (
+                            <button
+                              onClick={() => handleReactivateParty(party.id)}
+                              className={`w-full flex items-center px-4 py-3 text-left rounded-lg transition-all duration-200 ${
+                                darkMode 
+                                  ? 'text-green-400 hover:bg-green-900/20 hover:text-green-300' 
+                                  : 'text-green-600 hover:bg-green-50 hover:text-green-700'
+                              }`}
+                            >
+                              <UserCheck className="w-4 h-4 mr-3" />
+                              Réactiver
+                            </button>
+                          ) : null}
+                          
+                          <div className={`my-2 h-px ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}></div>
+                          
+                          <button
+                            onClick={() => handleDeleteParty(party.id)}
+                            className={`w-full flex items-center px-4 py-3 text-left rounded-lg transition-all duration-200 ${
+                              darkMode 
+                                ? 'text-red-400 hover:bg-red-900/20 hover:text-red-300' 
+                                : 'text-red-600 hover:bg-red-50 hover:text-red-700'
+                            }`}
+                          >
+                            <Trash2 className="w-4 h-4 mr-3" />
+                            Supprimer
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -291,14 +371,14 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
                 <div className="flex items-center space-x-3">
                   <Calendar className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
                   <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    Ajouté le {party.addedDate}
+                    Ajouté le {new Date(party.addedDate).toLocaleDateString('fr-FR')}
                   </span>
                 </div>
                 {party.lastAccess && (
                   <div className="flex items-center space-x-3">
                     <User className={`w-4 h-4 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
                     <span className={`text-sm ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      Dernier accès: {party.lastAccess}
+                      Dernier accès: {new Date(party.lastAccess).toLocaleDateString('fr-FR')}
                     </span>
                   </div>
                 )}
@@ -333,7 +413,13 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
                 : `Aucun tiers ${filterStatus === 'active' ? 'actif' : filterStatus === 'pending' ? 'en attente' : 'inactif'} trouvé`
               }
             </p>
-            <button className="px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poly font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200">
+            <button 
+              onClick={() => {
+                setEditingParty(null);
+                setShowModal(true);
+              }}
+              className="px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poly font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200"
+            >
               Ajouter un tiers de confiance
             </button>
           </div>
@@ -341,7 +427,9 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
 
         {/* Security Notice */}
         <div className={`mt-8 p-6 rounded-2xl border-2 ${
-          darkMode ? 'bg-amber-900/20 border-amber-800' : 'bg-amber-50 border-amber-200'
+          darkMode 
+            ? 'bg-amber-900/20 border-amber-800' 
+            : 'bg-amber-50 border-amber-200'
         }`}>
           <div className="flex items-start space-x-3">
             <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
@@ -357,6 +445,24 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
             </div>
           </div>
         </div>
+
+        {/* Modal */}
+        <TrustedPartyModal
+          isOpen={showModal}
+          onClose={() => {
+            setShowModal(false);
+            setEditingParty(null);
+          }}
+          onSubmit={async (data) => {
+            if (editingParty) {
+              await handleUpdateParty(data as UpdateTrustedPartyData);
+            } else {
+              await handleCreateParty(data as CreateTrustedPartyData);
+            }
+          }}
+          darkMode={darkMode}
+          editingParty={editingParty}
+        />
       </div>
     </Layout>
   );
