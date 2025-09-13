@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { db, auth } from "../firebase/firebase";
+import { useKKiaPay } from 'kkiapay-react';
+import { collection, onSnapshot, query, where, getDocs, addDoc, orderBy, increment, doc, updateDoc } from "firebase/firestore";
+
 import { 
   Vault, 
   TrendingUp, 
@@ -25,7 +29,8 @@ interface LayoutProps {
 export default function Layout({ children, onLogout }: LayoutProps) {
   const navigate = useNavigate();
   const { currentUser, loading, logout } = useAuth();
-  
+  const [vaultCount, setVaultCount] = useState<number>(0);
+
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('darkMode') === 'true' || 
@@ -42,6 +47,26 @@ export default function Layout({ children, onLogout }: LayoutProps) {
       navigate('/login', { replace: true });
     }
   }, [currentUser, loading, navigate]);
+
+
+
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const q = query(
+      collection(db, "vaults"),
+      where("userId", "==", user.uid)
+    );
+
+    // ✅ écoute en temps réel
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setVaultCount(snapshot.size); // nombre de docs
+      console.log("Nombre de coffres :", snapshot.size);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   // Apply dark mode to document
   React.useEffect(() => {
@@ -88,7 +113,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
   const menuItems = [
     { path: '/dashboard', icon: TrendingUp, label: 'Dashboard' },
-    { path: '/vaults', icon: Vault, label: 'Coffres d\'Épargne', badge: '3' },
+    { path: '/vaults', icon: Vault, label: 'Coffres d\'Épargne', badge: vaultCount },
     { path: '/analytics', icon: Target, label: 'Analyses' },
     { path: '/transactions', icon: CreditCard, label: 'Transactions' },
     { path: '/trusted-parties', icon: Users, label: 'Tiers de confiance' },

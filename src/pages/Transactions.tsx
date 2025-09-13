@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
+import { db, auth } from "../firebase/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import { 
   CreditCard,
   Search,
@@ -17,7 +20,8 @@ import {
   Vault,
   MoreHorizontal
 } from 'lucide-react';
-
+ 
+ 
 interface TransactionsProps {
   onLogout: () => void;
 }
@@ -31,44 +35,74 @@ export default function Transactions({ onLogout }: TransactionsProps) {
   });
   const [filterType, setFilterType] = useState('all');
   const [dateRange, setDateRange] = useState('30days');
+  const [transactions, setTransactions] = useState<any[]>([]);
 
-  // Listen for dark mode changes
-  React.useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setDarkMode(document.documentElement.classList.contains('dark'));
+
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        console.log("Utilisateur connecté :", user.uid);
+  
+        // const q = query(
+        //   collection(db, "transactions"),
+        //  where("userId", "==", user.uid),
+        //  orderBy("createdAt", "desc")
+
+        // );
+        const q = query(
+          collection(db, "transactions"),
+          where("userId", "==", auth.currentUser.uid),
+         
+        );
+        
+        const unsubscribeTransactions = onSnapshot(q, (snapshot) => {
+          const results: any[] = [];
+          snapshot.forEach((doc) => results.push({ id: doc.id, ...doc.data() }));
+          console.log("Transactions récupérées :", results);
+          setTransactions(results);
+        }, (error) => {
+          console.error("Erreur Firestore :", error);
+        });
+  
+        return () => unsubscribeTransactions(); // nettoyage snapshot
+      } else {
+        console.log("Pas d'utilisateur connecté");
+        setTransactions([]); // vide le tableau si déconnecté
+      }
     });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
+  
+    return () => unsubscribeAuth(); // nettoyage listener auth
   }, []);
+  
+// Filtrage
+const filteredTransactions = transactions.filter(transaction => {
+  if (filterType === 'all') return true;
+  return transaction.type === filterType;
+});
 
-  const cardClasses = darkMode 
-    ? 'bg-gray-800 border-gray-700 text-white' 
-    : 'bg-white border-gray-200 text-gray-900';
+// Totaux
+const totalIncome = transactions
+  .filter(t => t.type === "Revenus" || t.type === "income")
+  .reduce((sum, t) => sum + (t.montant || 0), 0);
 
-  const transactions = [
-    { id: 1, type: 'income', description: 'Salaire Mensuel', amount: 3500, date: '2025-01-15', time: '09:00', category: 'Revenus', icon: DollarSign, status: 'completed' },
-    { id: 2, type: 'vault', description: 'Coffre Voyage Europe', amount: -250, date: '2025-01-14', time: '14:30', category: 'Épargne', icon: Plane, status: 'completed' },
-    { id: 3, type: 'expense', description: 'Courses Premium Market', amount: -120, date: '2025-01-14', time: '11:15', category: 'Alimentation', icon: ShoppingBag, status: 'completed' },
-    { id: 4, type: 'expense', description: 'Carburant Total', amount: -65, date: '2025-01-13', time: '16:45', category: 'Transport', icon: Car, status: 'completed' },
-    { id: 5, type: 'income', description: 'Freelance Design Project', amount: 800, date: '2025-01-12', time: '10:20', category: 'Revenus', icon: Smartphone, status: 'completed' },
-    { id: 6, type: 'vault', description: 'Coffre Sécurité', amount: -400, date: '2025-01-11', time: '08:00', category: 'Épargne', icon: Vault, status: 'completed' },
-    { id: 7, type: 'expense', description: 'Abonnement Netflix', amount: -15.99, date: '2025-01-10', time: '12:00', category: 'Divertissement', icon: Smartphone, status: 'completed' },
-    { id: 8, type: 'vault', description: 'Coffre Auto Premium', amount: -500, date: '2025-01-09', time: '15:30', category: 'Épargne', icon: Car, status: 'completed' },
-    { id: 9, type: 'income', description: 'Remboursement Assurance', amount: 150, date: '2025-01-08', time: '13:45', category: 'Remboursements', icon: DollarSign, status: 'completed' },
-    { id: 10, type: 'expense', description: 'Restaurant Le Gourmet', amount: -85, date: '2025-01-07', time: '19:30', category: 'Restaurants', icon: ShoppingBag, status: 'completed' },
-  ];
+const totalExpenses = Math.abs(
+  transactions
+    .filter(t => t.type === "Dépense" || t.type === "expense")
+    .reduce((sum, t) => sum + (t.montant || 0), 0)
+);
 
-  const filteredTransactions = transactions.filter(transaction => {
-    if (filterType === 'all') return true;
-    return transaction.type === filterType;
-  });
+const totalSavings = Math.abs(
+  transactions
+    .filter(t => t.type === "Épargne" || t.type === "vault")
+    .reduce((sum, t) => sum + (t.montant || 0), 0)
+);
 
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
-  const totalExpenses = Math.abs(transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0));
-  const totalSavings = Math.abs(transactions.filter(t => t.type === 'vault').reduce((sum, t) => sum + t.amount, 0));
+const cardClasses = darkMode 
+  ? 'bg-gray-800 border-gray-700 text-white' 
+  : 'bg-white border-gray-200 text-gray-900';
 
   return (
-    <Layout onLogout={onLogout}>
+  <Layout onLogout={onLogout}>
       <div className="p-4 sm:p-6 lg:p-8">
         {/* Header */}
         <div className="mb-8">
@@ -187,63 +221,44 @@ export default function Transactions({ onLogout }: TransactionsProps) {
           </div>
           
           <div className="divide-y divide-gray-300 dark:divide-gray-600">
-            {filteredTransactions.map((transaction) => {
-              const TransactionIcon = transaction.icon;
-              return (
-                <div key={transaction.id} className={`p-6 transition-all duration-200 hover:bg-stone-50 dark:hover:bg-gray-700/50`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        darkMode ? 'bg-gray-700' : 'bg-stone-100'
-                      }`}>
-                        <TransactionIcon className={`w-5 h-5 ${
-                          transaction.type === 'income' 
-                            ? 'text-green-600 dark:text-green-400' 
-                            : transaction.type === 'vault'
-                            ? 'text-blue-600 dark:text-blue-400'
-                            : 'text-red-600 dark:text-red-400'
-                        }`} />
-                      </div>
-                      <div>
-                        <h3 className="font-poly font-bold text-base">
-                          {transaction.description}
-                        </h3>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {transaction.category}
-                          </p>
-                          <span className={`w-1 h-1 rounded-full ${darkMode ? 'bg-gray-600' : 'bg-gray-400'}`}></span>
-                          <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                            {transaction.date} à {transaction.time}
-                          </p>
+              {transactions.length === 0 ? (
+                <p className="p-6 text-center text-gray-500">Aucune transaction trouvée</p>
+              ) : (
+                transactions.map((transaction) => {
+                  const TransactionIcon = transaction.type === "income"
+                    ? DollarSign
+                    : transaction.type === "vault"
+                    ? Vault
+                    : ShoppingBag;
+
+                  return (
+                    <div key={transaction.id} className="p-6 hover:bg-stone-50 dark:hover:bg-gray-700/50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                            darkMode ? "bg-gray-700" : "bg-stone-100"
+                          }`}>
+                            <TransactionIcon className={`w-5 h-5 ${
+                              transaction.type === "income"
+                                ? "text-green-600 dark:text-green-400"
+                                : transaction.type === "vault"
+                                ? "text-blue-600 dark:text-blue-400"
+                                : "text-red-600 dark:text-red-400"
+                            }`} />
+                          </div>
+                          <div>
+                            <h3 className="font-poly font-bold text-base">{transaction.description || transaction.reference}</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">
+                              {transaction.type} — {transaction.montant} €
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className={`font-poly font-bold text-lg ${
-                          transaction.type === 'income' 
-                            ? 'text-green-600 dark:text-green-400' 
-                            : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {transaction.amount > 0 ? '+' : ''}{transaction.amount} €
-                        </p>
-                        <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                          Complétée
-                        </p>
-                      </div>
-                      <button className={`p-2 rounded-lg transition-all duration-200 ${
-                        darkMode ? 'hover:bg-gray-600' : 'hover:bg-stone-100'
-                      }`}>
-                        <MoreHorizontal className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })
+              )}
+            </div>
 
           <div className="p-6 border-t border-gray-300 dark:border-gray-600">
             <button className={`w-full py-3 text-center font-poly font-bold transition-all duration-200 rounded-xl ${
