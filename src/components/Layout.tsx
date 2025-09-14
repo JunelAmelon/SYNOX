@@ -48,8 +48,6 @@ export default function Layout({ children, onLogout }: LayoutProps) {
     }
   }, [currentUser, loading, navigate]);
 
-
-
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
@@ -93,7 +91,6 @@ export default function Layout({ children, onLogout }: LayoutProps) {
     ? 'dark bg-gray-900 text-white' 
     : 'bg-gray-50 text-gray-900';
 
-
   // Afficher un loader pendant la vérification d'authentification
   if (loading) {
     return (
@@ -123,16 +120,16 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${themeClasses}`}>
-      <header className={`h-24 flex items-center border-b transition-colors duration-300 pl-0 pr-4 sm:pr-6 lg:pr-8 ${
+      {/* Header */}
+      <header className={`h-24 flex items-center border-b transition-colors duration-300 px-4 sm:px-6 lg:px-8 ${
         darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
       }`}>
         <div className="flex items-center justify-between w-full">
-
-          {/* Logo */}
-          <div className="flex items-center">
+          {/* Logo et burger */}
+          <div className="flex items-center flex-1">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className={`lg:hidden p-2 rounded-lg mr-3 ${
+              className={`lg:hidden p-2 rounded-lg mr-4 ${
                 darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
               }`}
             >
@@ -142,41 +139,41 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             <img 
               src={darkMode ? "/logo-blanc.png" : "/logo-noir.png"} 
               alt="SYNOX Logo" 
-              className="h-[140px] sm:h-[170px] md:h-[180px] lg:h-[200px] w-auto object-contain"
+              className="h-[120px] sm:h-[140px] md:h-[160px] lg:h-[180px] w-auto object-contain"
             />
           </div>
 
           {/* User Menu */}
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             <button  
               onClick={() => setDarkMode(!darkMode)}
-              className={`p-2.5 rounded-xl transition-all duration-300 ${
+              className={`p-2 sm:p-2.5 rounded-xl transition-all duration-300 ${
                 darkMode 
                   ? 'text-amber-400 hover:bg-gray-700 bg-gray-700/50' 
                   : 'text-amber-600 hover:bg-amber-50 bg-amber-50/50'
               }`}
             >
-              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              {darkMode ? <Sun className="w-4 h-4 sm:w-5 sm:h-5" /> : <Moon className="w-4 h-4 sm:w-5 sm:h-5" />}
             </button>
             <Link 
               to="/notifications"
-              className={`p-2.5 rounded-xl transition-all duration-300 ${
+              className={`p-2 sm:p-2.5 rounded-xl transition-all duration-300 ${
                 darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <Bell className="w-5 h-5" />
+              <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
             </Link>
             <Link 
               to="/settings"
-              className={`p-2.5 rounded-xl transition-all duration-300 ${
+              className={`p-2 sm:p-2.5 rounded-xl transition-all duration-300 ${
                 darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
               }`}
             >
-              <Settings className="w-5 h-5" />
+              <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
             </Link>
-            <div className="flex items-center space-x-3 pl-3 border-l border-gray-300 dark:border-gray-600">
-              <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
-                <User className="w-5 h-5 text-white" />
+            <div className="flex items-center space-x-2 sm:space-x-3 pl-2 sm:pl-3 border-l border-gray-300 dark:border-gray-600">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                <User className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
               <div className="hidden sm:block">
                 <p className="font-poppins font-bold text-sm">
@@ -196,6 +193,17 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         <aside className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 fixed lg:static inset-y-0 left-0 z-50 w-72 border-r min-h-screen transition-all duration-300 ${
           darkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
         }`}>
+          {/* Logo dans la sidebar mobile */}
+          <div className={`lg:hidden flex items-center justify-center py-6 border-b ${
+            darkMode ? 'border-gray-700' : 'border-gray-200'
+          }`}>
+            <img 
+              src={darkMode ? "/logo-blanc.png" : "/logo-noir.png"} 
+              alt="SYNOX Logo" 
+              className="h-[100px] w-auto object-contain"
+            />
+          </div>
+          
           <nav className="p-6 pt-20 lg:pt-6">
             <div className="space-y-2">
               {menuItems.map((item) => {
@@ -259,19 +267,18 @@ export default function Layout({ children, onLogout }: LayoutProps) {
         <main className="flex-1 min-h-screen pb-20 lg:pb-6">
           {children}
           
- {/* Footer */}
+          {/* Footer */}
           <footer className={`mt-16 pt-4 pb-2 border-t transition-colors duration-300 ${
             darkMode ? 'border-gray-700' : 'border-gray-200'
           }`}>
             <div className="px-4 sm:px-6 lg:px-8">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center mb-4 md:mb-0">
-<img 
-  src={darkMode ? "/logo-blanc.png" : "/logo-noir.png"} 
-  alt="SYNOX Logo" 
-  className="w-[200px] h-auto" // par ex. 10x plus grand
-/>
-
+                  <img 
+                    src={darkMode ? "/logo-blanc.png" : "/logo-noir.png"} 
+                    alt="SYNOX Logo" 
+                    className="w-[200px] h-auto"
+                  />
                 </div>
                 
                 <div className="flex flex-col md:flex-row md:items-center md:space-x-8">
@@ -300,8 +307,6 @@ export default function Layout({ children, onLogout }: LayoutProps) {
               </div>
             </div>
           </footer>
-
-
         </main>
       </div>
 
