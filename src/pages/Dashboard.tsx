@@ -1,10 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '../components/Layout';
 import CreateVaultModal from '../components/CreateVaultModal';
+import DatePicker from 'react-datepicker';
+import "react-datepicker/dist/react-datepicker.css";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db, auth } from "../firebase/firebase";
 import { useAuth } from '../hooks/useAuth';
 import { onAuthStateChanged } from "firebase/auth";
+import { Link } from "react-router-dom";
+
 import { 
   TrendingUp, 
   Plus, 
@@ -27,7 +31,9 @@ import {
   ShoppingBag,
   Smartphone,
   Vault,
-  Target
+  Target, 
+  X, 
+  ArrowRight
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -47,6 +53,15 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [savingsVaults, setSavingsVaults] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<any[]>([]);
+  
+  // États pour la recherche de transactions
+  const [showTransactionSearch, setShowTransactionSearch] = useState(false);
+  const [transactionSearchTerm, setTransactionSearchTerm] = useState('');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'transactions'>('dashboard');
+  
+  // États pour le calendrier
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleCreateVault = (vaultData: any) => {
     console.log('Nouveau coffre créé:', vaultData);
@@ -54,6 +69,18 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     // Par exemple, l'ajouter à la liste des coffres existants
   };
 
+  // Fonction pour filtrer les transactions
+  const filteredTransactions = useMemo(() => {
+    if (!transactionSearchTerm.trim()) {
+      return transactions;
+    }
+    
+    return transactions.filter(transaction => 
+      transaction.type?.toLowerCase().includes(transactionSearchTerm.toLowerCase()) ||
+      transaction.category?.toLowerCase().includes(transactionSearchTerm.toLowerCase()) ||
+      transaction.montant.toString().includes(transactionSearchTerm)
+    );
+  }, [transactions, transactionSearchTerm]);
 
   useEffect(() => {
     const currentUser = auth.currentUser; // 🔑 récupère le user connecté
@@ -78,7 +105,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     return () => unsubscribe(); // Cleanup à la désinstallation
   }, []); // Pas de dépendance nécessaire, on prend directement auth.currentUser
   
-
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -114,7 +140,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   
     return () => unsubscribeAuth();
   }, []);
-  
 
   // Listen for dark mode changes
   React.useEffect(() => {
@@ -138,52 +163,8 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     other: { icon: Plus, name: 'Autre', color: 'from-slate-500 to-slate-600' }
   };
 
-  // const savingsVaults = [
-  //   { 
-  //     name: 'Coffre Voyage Europe', 
-  //     current: 2500, 
-  //     target: 5000, 
-  //     type: 'travel',
-  //     status: 'active',
-  //     monthlyContrib: 250,
-  //     daysLeft: 180,
-  //     isGoalBased: true
-  //   },
-  //   { 
-  //     name: 'Coffre Sécurité', 
-  //     current: 8000, 
-  //     target: 10000, 
-  //     type: 'emergency',
-  //     status: 'locked',
-  //     monthlyContrib: null,
-  //     daysLeft: null,
-  //     isGoalBased: false
-  //   },
-  //   { 
-  //     name: 'Coffre Auto Premium', 
-  //     current: 1200, 
-  //     target: 15000, 
-  //     type: 'car',
-  //     status: 'active',
-  //     monthlyContrib: 500,
-  //     daysLeft: 720,
-  //     isGoalBased: true
-  //   },
-  //   { 
-  //     name: 'Réserve Personnelle', 
-  //     current: 3200, 
-  //     target: null, 
-  //     type: 'other',
-  //     status: 'active',
-  //     monthlyContrib: null,
-  //     daysLeft: null,
-  //     isGoalBased: false
-  //   },
-  // ];
-
   // Calculs dynamiques pour les stats
   const totalBalance = savingsVaults.reduce((sum, vault) => sum + (vault.current || 0), 0);
-
   const totalInVaults = savingsVaults.reduce((sum, vault) => sum + (vault.current || 0), 0);
   
   const now = new Date();
@@ -202,11 +183,6 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const averageProgress = goalVaults.length > 0
     ? Math.round(goalVaults.reduce((sum, v) => sum + (v.current / v.target) * 100, 0) / goalVaults.length)
     : 0;
- 
-   
-  
-
-  
 
   const cardClasses = darkMode 
     ? 'bg-gray-800 border-gray-700 text-white' 
@@ -219,282 +195,455 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   return (
     <Layout onLogout={onLogout}>
       <div className="pt-4 px-4 sm:pt-6 sm:px-6 lg:pt-8 lg:px-8">
-          {/* Welcome Section */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-poppins font-bold mb-2">
-      Bonjour {  currentUser?.displayName } !
+        {/* Welcome Section */}
+        <div className="mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between mb-6 gap-4">
+  <div className="flex-1">
+    <h1 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-poppins font-bold mb-2">
+      Bonjour {currentUser?.displayName || 'Utilisateur'} !
     </h1>
-                <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-                  Voici un aperçu de vos coffres d'épargne aujourd'hui
-                </p>
-              </div>
-              <div className="flex items-center space-x-3">
-                <button className={`px-4 py-2 rounded-xl transition-all duration-200 ${
-                  darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}>
-                  <Filter className="w-4 h-4" />
-                </button>
-                <button className={`px-4 py-2 rounded-xl transition-all duration-200 ${
-                  darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}>
-                  <Calendar className="w-4 h-4" />
-                </button>
-              </div>
+    <p className={`text-sm sm:text-base lg:text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+      Voici un aperçu de vos coffres d'épargne aujourd'hui
+    </p>
+  </div>
+  
+  {/* Calendrier - caché sur très petit écran, visible à partir de sm */}
+  <div className=" sm:block">
+    <div className="relative">
+      <button 
+        onClick={() => setShowDatePicker(!showDatePicker)}
+        className={`flex items-center px-4 py-2 rounded-xl transition-all duration-200 ${
+          showDatePicker
+            ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+            : darkMode ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+        }`}
+      >
+        <Calendar className="w-4 h-4 mr-2" />
+        <span className="text-sm font-medium">
+          {selectedDate.toLocaleDateString('fr-FR', { 
+            day: 'numeric', 
+            month: 'short' 
+          })}
+        </span>
+      </button>
+      
+      {showDatePicker && (
+        <div className="absolute right-0 top-12 z-50">
+          <div className={`rounded-xl shadow-2xl border p-4 ${
+            darkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'
+          }`}>
+            <div className="mb-3">
+              <h3 className={`text-sm font-semibold ${
+                darkMode ? 'text-gray-200' : 'text-gray-800'
+              }`}>
+                Sélectionner une période
+              </h3>
+            </div>
+            
+            <DatePicker
+              selected={selectedDate}
+              onChange={(date: Date) => {
+                setSelectedDate(date);
+                setShowDatePicker(false);
+              }}
+              inline
+              locale="fr"
+              className={darkMode ? 'dark-datepicker' : 'light-datepicker'}
+            />
+            
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => {
+                  setSelectedDate(new Date());
+                  setShowDatePicker(false);
+                }}
+                className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                  darkMode 
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                Aujourd'hui
+              </button>
+              <button
+                onClick={() => {
+                  const lastWeek = new Date();
+                  lastWeek.setDate(lastWeek.getDate() - 7);
+                  setSelectedDate(lastWeek);
+                  setShowDatePicker(false);
+                }}
+                className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                  darkMode 
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                7 jours
+              </button>
+              <button
+                onClick={() => {
+                  const lastMonth = new Date();
+                  lastMonth.setMonth(lastMonth.getMonth() - 1);
+                  setSelectedDate(lastMonth);
+                  setShowDatePicker(false);
+                }}
+                className={`px-3 py-1 text-xs rounded-lg transition-colors ${
+                  darkMode 
+                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                30 jours
+              </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  </div>
+</div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl hover:scale-105 ${cardClasses}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <Wallet className="w-7 h-7 text-white" />
-                </div>
-                <div className="flex items-center">
-                  <ArrowUpRight className="w-5 h-5 text-emerald-500 mr-1" />
-                  <button 
-                    onClick={() => setShowBalance(!showBalance)}
-                    className={`p-1 rounded-lg transition-colors ${
-                      darkMode ? 'hover:bg-gray-700' : 'hover:bg-stone-100'
-                    }`}
-                  >
-                    {showBalance ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              <h3 className="font-poppins font-bold text-3xl mb-1">
-  {showBalance ? `${totalBalance.toLocaleString()} €` : '••••• €'}
-</h3>
-              <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Solde total disponible
-              </p>
-              <p className="text-emerald-600 text-sm font-poppins font-bold">+5.2% ce mois</p>
-            </div>
-
-            <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl hover:scale-105 ${cardClasses}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <Vault className="w-7 h-7 text-white" />
-                </div>
-                <ArrowUpRight className="w-5 h-5 text-blue-500" />
-              </div>
-              <h3 className="font-poppins font-bold text-3xl mb-1">
-  {showBalance ? `${totalInVaults.toLocaleString()} €` : '••••• €'}
-</h3>
-              <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Total dans les coffres
-              </p>
-              <p className="text-blue-600 text-sm font-poppins font-bold">+12.8% ce mois</p>
-            </div>
-
-            <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl hover:scale-105 ${cardClasses}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-amber-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <DollarSign className="w-7 h-7 text-white" />
-                </div>
-                <ArrowDownRight className="w-5 h-5 text-red-500" />
-              </div>
-{/* Dépenses ce mois */}
-<h3 className="font-poppins font-bold text-3xl mb-1">
-  {expensesThisMonth.toLocaleString()} €
-</h3>
-              <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Dépenses ce mois
-              </p>
-              <p className="text-red-600 text-sm font-poppins font-bold">-3.1% vs mois dernier</p>
-            </div>
-
-            <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl hover:scale-105 ${cardClasses}`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-                  <Target className="w-7 h-7 text-white" />
-                </div>
-                <ArrowUpRight className="w-5 h-5 text-emerald-500" />
-              </div>
-
-{/* Progression moyenne */}
-<h3 className="font-poppins font-bold text-3xl mb-1">
-  {averageProgress}%
-</h3>
-              <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Progression moyenne
-              </p>
-              <p className="text-emerald-600 text-sm font-poppins font-bold">2/3 coffres actifs</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Savings Vaults */}
  
-    <div className="lg:col-span-2">
-      <div className={`rounded-2xl p-6 border transition-colors duration-300 ${cardClasses}`}>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-poppins font-bold">Mes Coffres d'Épargne</h2>
-          <button 
-            onClick={() => setShowCreateModal(true)}
-            className="flex items-center px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poppins font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
-          >
-            <Plus className="w-5 h-5 mr-2" />
-            Nouveau Coffre
-          </button>
+
+          
+          {/* Indicateur de période sélectionnée */}
+          <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium mb-4 ${
+            darkMode 
+              ? 'bg-blue-900/30 text-blue-400 border border-blue-800' 
+              : 'bg-blue-50 text-blue-700 border border-blue-200'
+          }`}>
+            <Calendar className="w-4 h-4" />
+            <span className="ml-2">
+              Données pour le {selectedDate.toLocaleDateString('fr-FR', { 
+                weekday: 'long',
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </span>
+          </div>
         </div>
 
-        <div className="space-y-6">
-          {savingsVaults.map((vault) => {
-            const VaultIcon = vaultTypes[vault.type]?.icon || Plus;
-            const vaultTypeInfo = vaultTypes[vault.type] || { color: 'from-gray-400 to-gray-500', icon: Plus };
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl hover:scale-105 ${cardClasses}`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-xl flex items-center justify-center shadow-lg">
+                <Wallet className="w-7 h-7 text-white" />
+              </div>
+              <div className="flex items-center">
+                <ArrowUpRight className="w-5 h-5 text-emerald-500 mr-1" />
+                <button 
+                  onClick={() => setShowBalance(!showBalance)}
+                  className={`p-1 rounded-lg transition-colors ${
+                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-stone-100'
+                  }`}
+                >
+                  {showBalance ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <h3 className="font-poppins font-bold text-3xl mb-1">
+              {showBalance ? `${totalBalance.toLocaleString()} €` : '••••• €'}
+            </h3>
+            <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Solde total disponible
+            </p>
+            <p className="text-emerald-600 text-sm font-poppins font-bold">+5.2% ce mois</p>
+          </div>
 
-            return (
-              <div key={vault.id} className={`p-6 rounded-2xl border transition-all duration-300 hover:shadow-lg ${
-                darkMode ? 'bg-gray-800/50 border-gray-600' : 'bg-gray-50 border-gray-200'
-              }`}>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center">
-                    <div className={`w-12 h-12 bg-gradient-to-br ${vaultTypeInfo.color} rounded-xl flex items-center justify-center shadow-lg mr-4`}>
-                      <VaultIcon className="w-6 h-6 text-white" />
+          <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl hover:scale-105 ${cardClasses}`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-500 rounded-xl flex items-center justify-center shadow-lg">
+                <Vault className="w-7 h-7 text-white" />
+              </div>
+              <ArrowUpRight className="w-5 h-5 text-blue-500" />
+            </div>
+            <h3 className="font-poppins font-bold text-3xl mb-1">
+              {showBalance ? `${totalInVaults.toLocaleString()} €` : '••••• €'}
+            </h3>
+            <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Total dans les coffres
+            </p>
+            <p className="text-blue-600 text-sm font-poppins font-bold">+12.8% ce mois</p>
+          </div>
+
+          <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl hover:scale-105 ${cardClasses}`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-amber-400 to-amber-500 rounded-xl flex items-center justify-center shadow-lg">
+                <DollarSign className="w-7 h-7 text-white" />
+              </div>
+              <ArrowDownRight className="w-5 h-5 text-red-500" />
+            </div>
+            <h3 className="font-poppins font-bold text-3xl mb-1">
+              {expensesThisMonth.toLocaleString()} €
+            </h3>
+            <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Dépenses ce mois
+            </p>
+            <p className="text-red-600 text-sm font-poppins font-bold">-3.1% vs mois dernier</p>
+          </div>
+
+          <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl hover:scale-105 ${cardClasses}`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-purple-400 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                <Target className="w-7 h-7 text-white" />
+              </div>
+              <ArrowUpRight className="w-5 h-5 text-emerald-500" />
+            </div>
+            <h3 className="font-poppins font-bold text-3xl mb-1">
+              {averageProgress}%
+            </h3>
+            <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Progression moyenne
+            </p>
+            <p className="text-emerald-600 text-sm font-poppins font-bold">2/3 coffres actifs</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Savings Vaults */}
+          <div className="lg:col-span-2">
+            <div className={`rounded-2xl p-3 sm:p-4 lg:p-6 border transition-colors duration-300 ${cardClasses}`}>
+              {/* Header responsive */}
+              <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 mb-4 sm:mb-6">
+                <h2 className="text-lg sm:text-xl lg:text-2xl font-poppins font-bold leading-tight">
+                  Mes Coffres d'Épargne
+                </h2>
+                <button 
+                  onClick={() => setShowCreateModal(true)}
+                  className="flex items-center justify-center px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poppins font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 text-sm sm:text-base"
+                >
+                  <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                  <span className="whitespace-nowrap">Nouveau Coffre</span>
+                </button>
+              </div>
+
+              <div className="space-y-4 sm:space-y-6">
+                {savingsVaults.map((vault) => {
+                  const VaultIcon = vaultTypes[vault.type]?.icon || Plus;
+                  const vaultTypeInfo = vaultTypes[vault.type] || { color: 'from-gray-400 to-gray-500', icon: Plus };
+
+                  return (
+                    <div key={vault.id} className={`p-3 sm:p-4 lg:p-6 rounded-2xl border transition-all duration-300 hover:shadow-lg ${
+                      darkMode ? 'bg-gray-800/50 border-gray-600' : 'bg-gray-50 border-gray-200'
+                    }`}>
+                      {/* Header du vault - responsive */}
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4 space-y-3 sm:space-y-0">
+                        <div className="flex items-center min-w-0 flex-1">
+                          <div className={`w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br ${vaultTypeInfo.color} rounded-xl flex items-center justify-center shadow-lg mr-3 sm:mr-4 flex-shrink-0`}>
+                            <VaultIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-poppins font-bold text-base sm:text-lg leading-tight truncate pr-2">
+                              {vault.name}
+                            </h3>
+                            <p className={`text-xs sm:text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'} truncate`}>
+                              {vault.isGoalBased && vault.monthlyContrib 
+                                ? `${vault.monthlyContrib}€/mois • ${vault.daysLeft} jours restants`
+                                : vault.isGoalBased 
+                                  ? `Objectif: ${vault.target?.toLocaleString()}€`
+                                  : 'Épargne libre'
+                              }
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Montants - responsive */}
+                        <div className="text-left sm:text-right flex-shrink-0">
+                          {vault.target ? (
+                            <>
+                              <p className="font-poppins font-bold text-base sm:text-lg leading-tight">
+                                <span className="block sm:inline">{vault.current.toLocaleString()} €</span>
+                                <span className="hidden sm:inline"> / </span>
+                                <span className="block sm:inline text-sm sm:text-base text-gray-500">
+                                  {vault.target.toLocaleString()} €
+                                </span>
+                              </p>
+                              <p className={`text-xs sm:text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                {Math.round((vault.current / vault.target) * 100)}% complété
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-poppins font-bold text-base sm:text-lg">
+                                {vault.current.toLocaleString()} €
+                              </p>
+                              <p className={`text-xs sm:text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                                Épargne libre
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Barre de progression */}
+                      {vault.target && (
+                        <div className="relative mb-3 sm:mb-4">
+                          <div className={`w-full h-3 sm:h-4 rounded-full ${
+                            darkMode ? 'bg-gray-700' : 'bg-gray-200'
+                          }`}>
+                            <div 
+                              className={`h-3 sm:h-4 rounded-full bg-gradient-to-r ${vaultTypeInfo.color} transition-all duration-500 shadow-lg`}
+                              style={{ width: `${Math.min((vault.current / vault.target) * 100, 100)}%` }}
+                            ></div>
+                          </div>
+                          <div className="flex justify-between mt-1 sm:mt-2 text-xs">
+                            <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>0€</span>
+                            <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>
+                              {vault.target.toLocaleString()}€
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Footer du vault */}
+                      <div className="flex items-center justify-between pt-3 sm:pt-4 border-t border-gray-300 dark:border-gray-600">
+                        <div className="flex items-center space-x-2 sm:space-x-4">
+                          <span className={`px-2 sm:px-3 py-1 rounded-full text-xs font-poppins font-semibold ${
+                            vault.status === 'locked' 
+                              ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          }`}>
+                            {vault.status === 'locked' ? 'Verrouillé' : 'Actif'}
+                          </span>
+                        </div>
+                        <button className={`p-2 sm:px-4 sm:py-2 rounded-lg transition-all duration-200 ${
+                          darkMode 
+                            ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}>
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-poppins font-bold text-lg">{vault.name}</h3>
-                      <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {vault.isGoalBased && vault.monthlyContrib 
-                          ? `${vault.monthlyContrib}€/mois • ${vault.daysLeft} jours restants`
-                          : vault.isGoalBased 
-                            ? `Objectif: ${vault.target?.toLocaleString()}€`
-                            : 'Épargne libre'
-                        }
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    {vault.target ? (
-                      <>
-                        <p className="font-poppins font-bold text-lg">
-                          {vault.current.toLocaleString()} € / {vault.target.toLocaleString()} €
-                        </p>
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          {Math.round((vault.current / vault.target) * 100)}% complété
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="font-poppins font-bold text-lg">
-                          {vault.current.toLocaleString()} €
-                        </p>
-                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                          Épargne libre
-                        </p>
-                      </>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Recent Transactions */}
+          <div>
+            <div className={`rounded-2xl p-3 sm:p-4 lg:p-6 border transition-colors duration-300 ${cardClasses}`}>
+              <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 mb-4 sm:mb-6">
+                <h2 className="text-lg sm:text-xl font-poppins font-bold">Transactions Récentes</h2>
+                <button 
+                  onClick={() => setShowTransactionSearch(!showTransactionSearch)}
+                  className={`p-2 rounded-lg transition-all duration-200 ${
+                    showTransactionSearch 
+                      ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+                      : darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                  }`}
+                >
+                  <Search className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              </div>
+
+              {/* Barre de recherche */}
+              {showTransactionSearch && (
+                <div className="mb-4 sm:mb-6">
+                  <div className="relative">
+                    <Search className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 ${
+                      darkMode ? 'text-gray-400' : 'text-gray-500'
+                    }`} />
+                    <input
+                      type="text"
+                      value={transactionSearchTerm}
+                      onChange={(e) => setTransactionSearchTerm(e.target.value)}
+                      placeholder="Rechercher une transaction..."
+                      className={`w-full pl-10 pr-4 py-2 sm:py-3 text-sm sm:text-base rounded-xl border transition-colors ${
+                        darkMode 
+                          ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:border-amber-500' 
+                          : 'bg-white border-gray-200 text-gray-900 placeholder-gray-500 focus:border-amber-500'
+                      } focus:outline-none focus:ring-2 focus:ring-amber-500/20`}
+                    />
+                    {transactionSearchTerm && (
+                      <button
+                        onClick={() => setTransactionSearchTerm('')}
+                        className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full transition-colors ${
+                          darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-100'
+                        }`}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     )}
                   </div>
                 </div>
+              )}
 
-                {vault.target && (
-                  <div className="relative">
-                    <div className={`w-full h-4 rounded-full ${
-                      darkMode ? 'bg-gray-700' : 'bg-gray-200'
-                    }`}>
-                      <div 
-                        className={`h-4 rounded-full bg-gradient-to-r ${vaultTypeInfo.color} transition-all duration-500 shadow-lg`}
-                        style={{ width: `${(vault.current / vault.target) * 100}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between mt-2 text-xs">
-                      <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>0€</span>
-                      <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>
-                        {vault.target.toLocaleString()}€
-                      </span>
-                    </div>
+              <div className="space-y-2 sm:space-y-3">
+                {filteredTransactions.length > 0 ? (
+                  filteredTransactions.slice(0, 5).map((transaction) => {
+                    const TransactionIcon = transaction.icon || DollarSign;
+                    return (
+                      <div key={transaction.id} className={`flex items-center justify-between p-3 sm:p-4 rounded-xl transition-all duration-200 ${hoverClasses}`}>
+                        <div className="flex items-center min-w-0 flex-1">
+                          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                            darkMode ? 'bg-gray-700' : 'bg-gray-50'
+                          }`}>
+                            <TransactionIcon className={`w-4 h-4 sm:w-5 sm:h-5 ${
+                              transaction.montant > 0
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400'
+                            }`} />
+                          </div>
+                          <div className="ml-3 sm:ml-4 min-w-0 flex-1">
+                            <p className="font-poppins font-bold text-xs sm:text-sm truncate">
+                              {transaction.type}
+                            </p>
+                            <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} truncate`}>
+                              {transaction.category || 'Général'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0 ml-2">
+                          <p className={`font-poppins font-bold text-xs sm:text-sm ${
+                            transaction.montant > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                          }`}>
+                            {transaction.montant > 0 ? '+' : ''}{Math.abs(transaction.montant).toLocaleString()} €
+                          </p>
+                          <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {transaction.createdAt?.toDate?.().toLocaleDateString('fr-FR') || 'Date inconnue'}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : transactionSearchTerm ? (
+                  <div className="text-center py-8">
+                    <Search className={`w-12 h-12 mx-auto mb-3 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Aucune transaction trouvée pour "{transactionSearchTerm}"
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <DollarSign className={`w-12 h-12 mx-auto mb-3 ${darkMode ? 'text-gray-600' : 'text-gray-400'}`} />
+                    <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Aucune transaction récente
+                    </p>
                   </div>
                 )}
-
-                <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-300 dark:border-gray-600">
-                  <div className="flex items-center space-x-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-poppins font-semibold ${
-                      vault.status === 'locked' 
-                        ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
-                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                    }`}>
-                      {vault.status === 'locked' ? 'Verrouillé' : 'Actif'}
-                    </span>
-                  </div>
-                  <button className={`px-4 py-2 rounded-lg transition-all duration-200 ${
-                    darkMode 
-                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}>
-                    <MoreHorizontal className="w-4 h-4" />
-                  </button>
-                </div>
               </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  
 
-            {/* Recent Transactions */}
-            <div>
-              <div className={`rounded-2xl p-6 border transition-colors duration-300 ${cardClasses}`}>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-poppins font-bold">Transactions Récentes</h2>
-                  <button className={`p-2 rounded-lg transition-all duration-200 ${
-                    darkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-                  }`}>
-                    <Search className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                {transactions.length > 0 ? (
-  transactions.map((transaction) => {
-    const TransactionIcon = transaction.icon || DollarSign; // fallback icon
-    return (
-      <div key={transaction.id} className={`flex items-center justify-between p-4 rounded-xl transition-all duration-200 ${hoverClasses}`}>
-        <div className="flex items-center">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
-            <TransactionIcon className={`w-5 h-5 ${
-              transaction.montant > 0
-                ? 'text-green-600 dark:text-green-400'
-                : 'text-red-600 dark:text-red-400'
-            }`} />
-          </div>
-          <div className="ml-4">
-            <p className="font-poppins font-bold text-sm">{transaction.type}</p>
-            <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>{transaction.category}</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className={`font-poppins font-bold text-sm ${
-            transaction.montant > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-          }`}>
-            {transaction.montant > 0 ? '+' : ''}{transaction.montant} €
-          </p>
-          <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-            {transaction.createdAt?.toDate?.().toLocaleDateString() || ''}
-          </p>
-        </div>
-      </div>
-    );
-  })
-) : (
-  <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Aucune transaction récente</p>
-)}
-
-                </div>
-
-                <button className={`w-full mt-6 py-3 text-center font-poppins font-bold transition-all duration-200 rounded-xl ${
-                  darkMode 
-                    ? 'text-gray-300 hover:text-white hover:bg-gray-700/50' 
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                }`}>
+              {/* Bouton voir toutes les transactions - Centré */}
+              <div className="flex justify-center mt-4 sm:mt-6">
+                <Link
+                  to="/transactions"
+                  className={`inline-flex items-center justify-center px-6 py-2 sm:py-3 font-poppins font-bold transition-all duration-200 rounded-xl text-sm sm:text-base ${
+                    darkMode 
+                      ? 'text-gray-300 hover:text-white hover:bg-gray-700/50' 
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  }`}
+                >
                   Voir toutes les transactions
-                </button>
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Link>
               </div>
             </div>
           </div>
+        </div>
       </div>
 
       {/* Create Vault Modal */}

@@ -21,26 +21,18 @@ export interface VaultPushNotification extends PushNotificationData {
 }
 
 export interface TrustedPartyPushNotification extends PushNotificationData {
-  vaultId: string;
-  vaultName: string;
+  vaultId?: string;
+  vaultName?: string;
   requesterName: string;
-  action: 'approval_request' | 'approval_granted' | 'approval_denied';
+  trustedPartyName?: string;
+  action: 'approval_request' | 'approval_granted' | 'approval_denied' | 'trusted_party_added' | 'trusted_party_removed';
 }
 
 // Interface pour les requêtes API
 interface PushNotificationRequest {
   type: 'vault_notification' | 'trusted_party_notification';
-  tokens: string | string[]; // Token(s) FCM du/des destinataire(s)
+  tokens: string | string[];
   notification: VaultPushNotification | TrustedPartyPushNotification;
-}
-
-interface ApiRequest {
-  method: string;
-  body: PushNotificationRequest;
-}
-
-interface ApiResponse {
-  status: (code: number) => { json: (data: { error?: string; success?: boolean; message?: string; results?: any }) => void };
 }
 
 // Service pour l'envoi de notifications push
@@ -171,6 +163,54 @@ export class PushNotificationService {
     return this.sendNotification(token, notification);
   }
 
+  // Envoyer une notification d'ajout comme tiers de confiance
+  static async sendTrustedPartyAddedNotification(
+    token: string,
+    requesterName: string,
+    trustedPartyName: string
+  ): Promise<boolean> {
+    const notification: TrustedPartyPushNotification = {
+      title: '🤝 Vous êtes maintenant un tiers de confiance',
+      body: `${requesterName} vous a ajouté comme tiers de confiance sur SYNOX. Vous pouvez maintenant l'aider à gérer ses coffres d'épargne.`,
+      icon: '/logo-noir.png',
+      requesterName,
+      trustedPartyName,
+      action: 'trusted_party_added',
+      data: {
+        type: 'trusted_party_added',
+        requesterName,
+        trustedPartyName,
+        clickAction: '/trusted-parties'
+      }
+    };
+
+    return this.sendNotification(token, notification);
+  }
+
+  // Envoyer une notification de suppression comme tiers de confiance
+  static async sendTrustedPartyRemovedNotification(
+    token: string,
+    requesterName: string,
+    trustedPartyName: string
+  ): Promise<boolean> {
+    const notification: TrustedPartyPushNotification = {
+      title: '🚫 Accès tiers de confiance retiré',
+      body: `${requesterName} a retiré votre accès comme tiers de confiance sur SYNOX.`,
+      icon: '/logo-noir.png',
+      requesterName,
+      trustedPartyName,
+      action: 'trusted_party_removed',
+      data: {
+        type: 'trusted_party_removed',
+        requesterName,
+        trustedPartyName,
+        clickAction: '/trusted-parties'
+      }
+    };
+
+    return this.sendNotification(token, notification);
+  }
+
   // Méthode générique pour envoyer une notification
   private static async sendNotification(token: string, notificationData: PushNotificationData): Promise<boolean> {
     try {
@@ -258,100 +298,6 @@ export class PushNotificationService {
         responses: []
       };
     }
-  }
-}
-
-// Handler pour l'API
-export default async function handler(req: ApiRequest, res: ApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Méthode non autorisée' });
-  }
-
-  try {
-    const { type, tokens, notification }: PushNotificationRequest = req.body;
-
-    if (!type || !tokens || !notification) {
-      return res.status(400).json({ error: 'Paramètres manquants' });
-    }
-
-    let success = false;
-    let results: any = null;
-
-    // Gérer l'envoi à un ou plusieurs tokens
-    if (Array.isArray(tokens)) {
-      // Envoi multicast
-      results = await PushNotificationService.sendMulticastNotification(tokens, notification);
-      success = results.successCount > 0;
-    } else {
-      // Envoi à un seul token
-      switch (type) {
-        case 'vault_notification':
-          const vaultNotif = notification as VaultPushNotification;
-          switch (vaultNotif.action) {
-            case 'vault_created':
-              success = await PushNotificationService.sendVaultCreatedNotification(
-                tokens, 
-                vaultNotif.vaultName, 
-                vaultNotif.targetAmount
-              );
-              break;
-            case 'goal_reached':
-              success = await PushNotificationService.sendGoalReachedNotification(
-                tokens, 
-                vaultNotif.vaultName, 
-                vaultNotif.amount!
-              );
-              break;
-            case 'deposit':
-              success = await PushNotificationService.sendDepositNotification(
-                tokens, 
-                vaultNotif.vaultName, 
-                vaultNotif.amount!
-              );
-              break;
-            case 'vault_locked':
-              success = await PushNotificationService.sendVaultLockedNotification(
-                tokens, 
-                vaultNotif.vaultName
-              );
-              break;
-            case 'vault_unlocked':
-              success = await PushNotificationService.sendVaultUnlockedNotification(
-                tokens, 
-                vaultNotif.vaultName
-              );
-              break;
-          }
-          break;
-
-        case 'trusted_party_notification':
-          const trustedNotif = notification as TrustedPartyPushNotification;
-          if (trustedNotif.action === 'approval_request') {
-            success = await PushNotificationService.sendApprovalRequestNotification(
-              tokens,
-              trustedNotif.vaultName,
-              trustedNotif.requesterName,
-              trustedNotif.vaultId
-            );
-          }
-          break;
-
-        default:
-          return res.status(400).json({ error: 'Type de notification non supporté' });
-      }
-    }
-
-    if (success || (results && results.successCount > 0)) {
-      res.status(200).json({ 
-        message: 'Notification(s) envoyée(s) avec succès',
-        results 
-      });
-    } else {
-      res.status(500).json({ error: 'Erreur lors de l\'envoi de la notification' });
-    }
-  } catch (error) {
-    console.error('Erreur API push notifications:', error);
-    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 }
 
