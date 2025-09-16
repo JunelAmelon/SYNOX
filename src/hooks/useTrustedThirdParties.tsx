@@ -2,18 +2,18 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { 
   collection, 
-  doc, 
   addDoc, 
   updateDoc, 
   deleteDoc, 
-  getDocs, 
+  doc, 
   query, 
   where, 
+  onSnapshot, 
   orderBy,
-  onSnapshot,
   Timestamp 
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
+import { emailService, TrustedPartyInvitationData } from '../lib/emailService';
 
 export type TrustedPartyStatus = 'active' | 'pending' | 'inactive' | 'revoked';
 export type Permission = 'view_vaults' | 'manage_vaults' | 'emergency_access' | 'view_analytics' | 'approve_withdrawals';
@@ -213,6 +213,26 @@ export function useTrustedThirdParties() {
         createdAt: Timestamp.fromDate(now),
         expiresAt: Timestamp.fromDate(invitationExpiry),
       });
+
+      // Envoyer l'email d'invitation
+      try {
+        const invitationData: TrustedPartyInvitationData = {
+          inviterName: currentUser.displayName || currentUser.email || 'Utilisateur SYNOX',
+          inviterEmail: currentUser.email || '',
+          trustedPartyName: partyData.name,
+          trustedPartyEmail: partyData.email,
+          permissions: partyData.permissions,
+          invitationToken,
+          acceptUrl: `${window.location.origin}/accept-invitation?token=${invitationToken}`,
+          expiryDate: invitationExpiry.toISOString(),
+        };
+
+        await emailService.sendTrustedPartyInvitation(invitationData);
+        console.log('Email d\'invitation envoyé avec succès');
+      } catch (emailError) {
+        console.error('Erreur lors de l\'envoi de l\'email d\'invitation:', emailError);
+        // Ne pas faire échouer la création si l'email échoue
+      }
 
       return docRef.id;
     } catch (err) {

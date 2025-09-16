@@ -11,6 +11,8 @@ import Transactions from './pages/Transactions.tsx';
 import TrustedThirdParties from './pages/TrustedThirdParties.tsx';
 import Notifications from './pages/Notifications.tsx';
 import Settings from './pages/Settings.tsx';
+import AcceptInvitation from './pages/AcceptInvitation.tsx';
+import ApproveWithdrawal from './pages/ApproveWithdrawal.tsx';
 
 function App() {
   const handleLogout = () => {
@@ -33,6 +35,8 @@ function App() {
             <Route path="/trusted-parties" element={<TrustedThirdParties onLogout={handleLogout} />} />
             <Route path="/notifications" element={<Notifications onLogout={handleLogout} />} />
             <Route path="/settings" element={<Settings onLogout={handleLogout} />} />
+            <Route path="/accept-invitation" element={<AcceptInvitation/>} />
+            <Route path="/approve-withdrawal" element={<ApproveWithdrawal/>} />
           </Routes>
         </Router>
       </ToastProvider>

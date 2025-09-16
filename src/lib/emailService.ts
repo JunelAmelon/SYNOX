@@ -1,17 +1,4 @@
-import nodemailer from 'nodemailer';
-
-// Configuration du transporteur email
-const createTransporter = () => {
-  return nodemailer.createTransporter({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false, // true pour 465, false pour les autres ports
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-};
+import emailjs from '@emailjs/browser';
 
 // Types pour les emails
 export interface EmailData {
@@ -30,6 +17,17 @@ export interface VaultNotificationData {
   date: string;
 }
 
+export interface WithdrawalApprovalData {
+  trustedPartyName: string;
+  trustedPartyEmail: string;
+  userName: string;
+  vaultName: string;
+  amount: number;
+  reason: string;
+  approvalUrl: string;
+  requestId: string;
+}
+
 export interface TrustedPartyNotificationData {
   userName: string;
   trustedPartyName: string;
@@ -40,29 +38,49 @@ export interface TrustedPartyNotificationData {
   date: string;
 }
 
-// Service d'envoi d'emails
+export interface TrustedPartyInvitationData {
+  inviterName: string;
+  inviterEmail: string;
+  trustedPartyName: string;
+  trustedPartyEmail: string;
+  permissions: string[];
+  invitationToken: string;
+  acceptUrl: string;
+  expiryDate: string;
+}
+
+export interface TrustedPartyAcceptanceData {
+  trustedPartyName: string;
+  inviterName: string;
+  accessCode: string;
+  permissions: string[];
+}
+
+// Service d'envoi d'emails côté client avec EmailJS
 export class EmailService {
-  private transporter;
+  private serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_synox';
+  private publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'YOUR_EMAILJS_PUBLIC_KEY';
 
   constructor() {
-    this.transporter = createTransporter();
+    // Initialiser EmailJS
+    emailjs.init(this.publicKey);
   }
 
-  // Méthode générique pour envoyer un email
-  async sendEmail(emailData: EmailData): Promise<boolean> {
+  // Méthode générique pour envoyer un email via EmailJS
+  async sendEmail(emailData: EmailData, templateId: string = 'template_general'): Promise<boolean> {
     try {
-      const info = await this.transporter.sendMail({
-        from: `"SYNOX" <${process.env.SMTP_USER}>`,
-        to: emailData.to,
+      const templateParams = {
+        to_email: emailData.to,
         subject: emailData.subject,
-        text: emailData.text,
-        html: emailData.html,
-      });
+        html_content: emailData.html,
+        text_content: emailData.text || ''
+      };
 
-      console.log('Email envoyé:', info.messageId);
+      await emailjs.send(this.serviceId, templateId, templateParams);
+      console.log('Email envoyé avec succès via EmailJS');
       return true;
     } catch (error) {
-      console.error('Erreur lors de l\'envoi de l\'email:', error);
+      console.error('Erreur lors de l\'envoi de l\'email via EmailJS:', error);
       return false;
     }
   }
@@ -105,6 +123,99 @@ export class EmailService {
     const html = this.getVaultLockedTemplate(data);
     
     return this.sendEmail({ to: email, subject, html });
+  }
+
+  // Invitation de tiers de confiance
+  async sendTrustedPartyInvitation(data: TrustedPartyInvitationData): Promise<boolean> {
+    try {
+      const templateParams = {
+        to_email: data.trustedPartyEmail,
+        to_name: data.trustedPartyName,
+        from_name: data.inviterName,
+        from_email: data.inviterEmail,
+        accept_url: data.acceptUrl,
+        expiry_date: new Date(data.expiryDate).toLocaleDateString('fr-FR'),
+        permissions: data.permissions.join(', '),
+        invitation_token: data.invitationToken,
+        // Paramètres requis par EmailJS
+        reply_to: data.inviterEmail,
+        user_email: data.trustedPartyEmail
+      };
+
+      const invitationTemplateId = import.meta.env.VITE_EMAILJS_TEMPLATE_INVITATION || 'template_invitation';
+      await emailjs.send(
+        this.serviceId, 
+        invitationTemplateId, 
+        templateParams,
+        this.publicKey
+      );
+      console.log('Email d\'invitation envoyé avec succès via EmailJS');
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi de l\'email d\'invitation:', error);
+      return false;
+    }
+  }
+
+  // Code d'accès après acceptation d'invitation
+  async sendTrustedPartyAccessCode(email: string, data: TrustedPartyAcceptanceData): Promise<boolean> {
+    try {
+      const templateParams = {
+        to_email: email,
+        to_name: data.trustedPartyName,
+        from_name: data.inviterName,
+        access_code: data.accessCode,
+        permissions: data.permissions.join(', '),
+        // Paramètres requis par EmailJS
+        reply_to: 'noreply@synox.com',
+        user_email: email
+      };
+
+      const accessCodeTemplateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ACCESS_CODE || 'template_access_code';
+      await emailjs.send(
+        this.serviceId, 
+        accessCodeTemplateId, 
+        templateParams,
+        this.publicKey
+      );
+      console.log('Email de code d\'accès envoyé avec succès via EmailJS');
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi de l\'email de code d\'accès:', error);
+      return false;
+    }
+  }
+
+  // Envoyer une demande d'approbation de retrait
+  async sendWithdrawalApprovalRequest(data: WithdrawalApprovalData): Promise<boolean> {
+    try {
+      const templateParams = {
+        to_email: data.trustedPartyEmail,
+        to_name: data.trustedPartyName,
+        from_name: data.userName,
+        vault_name: data.vaultName,
+        amount: data.amount.toString(),
+        reason: data.reason,
+        approval_url: data.approvalUrl,
+        request_id: data.requestId,
+        // Paramètres requis par EmailJS
+        reply_to: 'noreply@synox.com',
+        user_email: data.trustedPartyEmail
+      };
+
+      const approvalTemplateId = import.meta.env.VITE_EMAILJS_TEMPLATE_APPROVAL || 'template_approval';
+      await emailjs.send(
+        this.serviceId, 
+        approvalTemplateId, 
+        templateParams,
+        this.publicKey
+      );
+      console.log('Email de demande d\'approbation envoyé avec succès via EmailJS');
+      return true;
+    } catch (error) {
+      console.error('Erreur lors de l\'envoi de l\'email d\'approbation:', error);
+      return false;
+    }
   }
 
   // Template pour création de coffre
@@ -475,6 +586,7 @@ export class EmailService {
     </html>
     `;
   }
+
 }
 
 // Instance singleton du service email

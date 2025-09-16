@@ -4,21 +4,17 @@ import CreateVaultModal from '../components/CreateVaultModal';
 import DepositModal from '../components/DepositModal';
 import WithdrawModal from '../components/WithdrawModal';
 import { useVaults, CreateVaultData } from '../hooks/useVaults';
-import { useAuth } from '../hooks/useAuth';
 import { useToastContext } from '../contexts/ToastContext';
+import { useWithdrawalApproval } from '../hooks/useWithdrawalApproval';
+import { useTrustedThirdParties } from '../hooks/useTrustedThirdParties';
 import { db, auth } from "../firebase/firebase";
 import { useKKiaPay } from 'kkiapay-react';
-import { collection, onSnapshot, query, where, getDocs, addDoc, orderBy, increment, doc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, where, getDoc, addDoc, increment, doc, updateDoc } from "firebase/firestore";
 import {
 Plus,
 Search,
-Filter,
-MoreVertical,
 Lock,
 Unlock,
-Eye,
-EyeOff,
-TrendingUp,
 Calendar,
 DollarSign,
 Target,
@@ -62,8 +58,6 @@ return document.documentElement.classList.contains('dark');
 });
 
 const [vaults, setVaults] = useState<Vault[]>([]);
-const [depositAmount, setDepositAmount] = useState<number>(0);
-const [depositVaultId, setDepositVaultId] = useState<string | null>(null);
 const [showCreateModal, setShowCreateModal] = useState(false);
 const [showDepositModal, setShowDepositModal] = useState(false);
 const [showWithdrawModal, setShowWithdrawModal] = useState(false);
@@ -72,8 +66,6 @@ const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'locked' | 'completed'>('all');
 const [currentPage, setCurrentPage] = useState(1);
 const [searchTerm, setSearchTerm] = useState('');
-const [userEnteredAmount, setUserEnteredAmount] = useState<number | "">(0);
-const { user } = useAuth();
 
 const {
 loading,
@@ -81,11 +73,12 @@ error,
 createVault,
 deleteVault,
 lockVault,
-unlockVault,
-filterVaults
+unlockVault
 } = useVaults();
 
 const { success, warning, error: showError } = useToastContext();
+const { createWithdrawalRequest } = useWithdrawalApproval();
+const { trustedParties } = useTrustedThirdParties();
 const vaultsPerPage = 3;
 
 // Listen for dark mode changes
@@ -205,7 +198,7 @@ showError("Impossible d'effectuer le dépôt. Réessayez plus tard.");
 
 // Fonction pour gérer les retraits depuis le modal
 const handleWithdrawFromModal = async (amount: number, reason: string) => {
-if (!selectedVault) return;
+if (!selectedVault || !auth.currentUser) return;
 
 try {
 const vaultRef = doc(db, "vaults", selectedVault.id);
@@ -224,29 +217,52 @@ showError("Montant supérieur au solde disponible !");
 return;
 }
 
-// Mettre à jour le vault (décrémenter)
-await updateDoc(vaultRef, {
-current: increment(-amount),
-updatedAt: new Date(),
-});
+// Récupérer les tiers de confiance actifs avec permission d'approbation
+const activeTrustedParties = trustedParties.filter(tp => 
+  tp.status === 'active' && 
+  tp.permissions.includes('approve_withdrawals')
+);
 
-// Créer la transaction de retrait
+if (activeTrustedParties.length < 2) {
+showError("Vous devez avoir au moins 2 tiers de confiance actifs avec permission d'approbation pour effectuer un retrait.");
+return;
+}
+
+// Prendre les 2 premiers tiers de confiance (ou implémenter une logique de sélection)
+const selectedTrustedParties = activeTrustedParties.slice(0, 2).map(tp => ({
+  trustedPartyId: tp.id,
+  trustedPartyName: tp.name,
+  trustedPartyEmail: tp.email,
+  accessCode: '' // Le code sera vérifié lors de l'approbation
+}));
+
+// Créer une demande de retrait au lieu d'effectuer le retrait directement
+const requestId = await createWithdrawalRequest(
+  auth.currentUser.uid,
+  selectedVault.id,
+  selectedVault.name,
+  amount,
+  reason,
+  selectedTrustedParties
+);
+
+// Créer une transaction de retrait en attente
 await createTransaction({
-amount: -amount, // Montant négatif pour le retrait
-paymentMethod: "Manuel",
-status: "active",
+amount: -amount,
+paymentMethod: "En attente d'approbation",
+status: "pending",
 type: "Retrait",
-userId: auth.currentUser?.uid,
+userId: auth.currentUser.uid,
 vaultId: selectedVault.id,
-reference: "Initiateur",
+reference: `Demande-${requestId}`,
 reason: reason
 });
 
 setOpenMenuId(null);
-success(`Retrait de ${amount}€ effectué avec succès !`);
+warning(`Demande de retrait de ${amount}€ créée. En attente d'approbation des tiers de confiance.`);
 } catch (err) {
-console.error("Erreur lors du retrait :", err);
-showError("Impossible d'effectuer le retrait. Réessayez plus tard.");
+console.error("Erreur lors de la demande de retrait :", err);
+showError("Impossible de créer la demande de retrait. Réessayez plus tard.");
 }
 };
 
@@ -254,7 +270,7 @@ const { openKkiapayWidget, addKkiapayListener, removeKkiapayListener } = useKKia
 
 // écouter les paiements
 useEffect(() => {
-const successHandler = async (response: any) => {
+const successHandler = async (response: { transactionId: string; data: string }) => {
 console.log("Paiement réussi :", response);
 
   const transactionId = response.transactionId;
@@ -303,7 +319,7 @@ console.log("Paiement réussi :", response);
   }
 };
 
-const failureHandler = (error: any) => {
+const failureHandler = (error: Error) => {
   console.error("Paiement échoué :", error);
   showError("Paiement échoué. Veuillez réessayer.");
 };
@@ -315,7 +331,7 @@ return () => {
   removeKkiapayListener("success", successHandler);
   removeKkiapayListener("failed", failureHandler);
 };
-}, [addKkiapayListener, removeKkiapayListener]);
+}, [addKkiapayListener, removeKkiapayListener, showError, success]);
 
 useEffect(() => {
 const currentUser = auth.currentUser;
