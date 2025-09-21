@@ -155,7 +155,7 @@ reason?: string;
 }) {
 try {
 const transactionsCollection = collection(db, "transactions");
-await addDoc(transactionsCollection, {
+const docRef = await addDoc(transactionsCollection, {
 createdAt: new Date(),
 id_transaction: Math.floor(Math.random() * 1000000),
 montant: amount,
@@ -168,8 +168,10 @@ reference,
 ...(reason && { reason })
 });
 console.log("Transaction enregistrée avec succès !!");
+return docRef; // Retourner la référence du document
 } catch (err) {
 console.error("Erreur création transaction :", err);
+throw err; // Propager l'erreur
 }
 }
 
@@ -247,7 +249,7 @@ const requestId = await createWithdrawalRequest(
 );
 
 // Créer une transaction de retrait en attente
-await createTransaction({
+const transactionRef = await createTransaction({
 amount: -amount,
 paymentMethod: "En attente d'approbation",
 status: "pending",
@@ -256,6 +258,11 @@ userId: auth.currentUser.uid,
 vaultId: selectedVault.id,
 reference: `Demande-${requestId}`,
 reason: reason
+});
+
+// Enregistrer l'ID de la transaction dans la demande de retrait
+await updateDoc(doc(db, 'withdrawalRequests', requestId), {
+transactionId: transactionRef.id
 });
 
 setOpenMenuId(null);

@@ -1,5 +1,15 @@
 import { useState } from 'react';
-import { collection, addDoc, updateDoc, doc, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { 
+  collection, 
+  addDoc, 
+  query, 
+  where, 
+  getDocs, 
+  updateDoc, 
+  doc, 
+  getDoc,
+  Timestamp 
+} from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { emailService } from '../lib/emailService';
 
@@ -10,9 +20,11 @@ export interface WithdrawalRequest {
   vaultName: string;
   amount: number;
   reason: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'completed' | 'failed';
   createdAt: Date;
+  approvedAt?: Date;
   requiredApprovals: number;
+  transactionId?: string; // ID de la transaction associée
   approvals: {
     trustedPartyId: string;
     trustedPartyName: string;
@@ -108,7 +120,6 @@ export const useWithdrawalApproval = () => {
       }
 
       const trustedPartyDoc = querySnapshot.docs[0];
-      const trustedPartyData = trustedPartyDoc.data();
 
       if (trustedPartyDoc.id !== trustedPartyId) {
         return { success: false, error: 'Code d\'accès ne correspond pas à ce tiers de confiance' };
@@ -152,6 +163,11 @@ export const useWithdrawalApproval = () => {
         ...(allApproved && { approvedAt: Timestamp.fromDate(new Date()) })
       });
 
+      // Si tous les tiers ont approuvé, traiter le retrait automatiquement
+      if (allApproved) {
+        await processWithdrawal(requestData, requestId);
+      }
+
       return { 
         success: true, 
         allApproved 
@@ -162,6 +178,76 @@ export const useWithdrawalApproval = () => {
       return { success: false, error: 'Erreur technique lors de l\'approbation' };
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Traiter le retrait après approbation complète
+  const processWithdrawal = async (requestData: WithdrawalRequest, requestId: string): Promise<void> => {
+    try {
+      // 1. Débiter le coffre
+      const vaultRef = doc(db, 'vaults', requestData.vaultId);
+      const vaultDoc = await getDoc(vaultRef);
+      
+      if (!vaultDoc.exists()) {
+        throw new Error('Coffre non trouvé');
+      }
+
+      const vaultData = vaultDoc.data();
+      const newBalance = vaultData.current - requestData.amount;
+
+      if (newBalance < 0) {
+        throw new Error('Solde insuffisant dans le coffre');
+      }
+
+      // Mettre à jour le solde du coffre
+      await updateDoc(vaultRef, {
+        current: newBalance,
+        updatedAt: Timestamp.fromDate(new Date())
+      });
+
+      // 2. Mettre à jour la transaction existante
+      if (requestData.transactionId) {
+        await updateDoc(doc(db, 'transactions', requestData.transactionId), {
+          status: 'completed',
+          paymentMethod: 'Retrait approuvé',
+          reference: `Retrait approuvé par tiers de confiance - ${requestData.reason}`,
+          updatedAt: Timestamp.fromDate(new Date())
+        });
+      } else {
+        // Fallback: créer une nouvelle transaction si l'ID n'existe pas
+        await addDoc(collection(db, 'transactions'), {
+          createdAt: Timestamp.fromDate(new Date()),
+          id_transaction: `withdrawal_${requestId}`,
+          montant: -requestData.amount, // Négatif pour un retrait
+          paymentMethod: 'Retrait approuvé',
+          status: 'completed',
+          type: 'Retrait',
+          userId: requestData.userId,
+          vaultId: requestData.vaultId,
+          reference: `Retrait approuvé par tiers de confiance - ${requestData.reason}`,
+          withdrawalRequestId: requestId
+        });
+      }
+
+      // 3. Mettre à jour le statut de la demande
+      await updateDoc(doc(db, 'withdrawalRequests', requestId), {
+        status: 'completed',
+        processedAt: Timestamp.fromDate(new Date())
+      });
+
+      console.log(`Retrait de ${requestData.amount}€ traité avec succès pour le coffre ${requestData.vaultId}`);
+
+    } catch (error) {
+      console.error('Erreur lors du traitement du retrait:', error);
+      
+      // Marquer la demande comme échouée
+      await updateDoc(doc(db, 'withdrawalRequests', requestId), {
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Erreur inconnue',
+        failedAt: Timestamp.fromDate(new Date())
+      });
+      
+      throw error;
     }
   };
 
