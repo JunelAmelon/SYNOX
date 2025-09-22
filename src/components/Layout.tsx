@@ -18,7 +18,7 @@ import {
   Moon,
   Sun,
   Menu,
-  X
+  X,
 } from 'lucide-react';
 
 interface LayoutProps {

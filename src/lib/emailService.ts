@@ -56,17 +56,99 @@ export interface TrustedPartyAcceptanceData {
   permissions: string[];
 }
 
+// Configuration des comptes EmailJS
+interface EmailJSAccount {
+  serviceId: string;
+  publicKey: string;
+}
+
+interface TemplateConfig {
+  id: string;
+  account: EmailJSAccount;
+}
+
 // Service d'envoi d'emails côté client avec EmailJS
 export class EmailService {
-  private serviceId = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_synox';
-  private publicKey = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'YOUR_EMAILJS_PUBLIC_KEY';
+  private accounts: { [key: string]: EmailJSAccount } = {
+    account1: {
+      serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID_1 || '',
+      publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY_1 || ''
+    },
+    account2: {
+      serviceId: import.meta.env.VITE_EMAILJS_SERVICE_ID_2 || '',
+      publicKey: import.meta.env.VITE_EMAILJS_PUBLIC_KEY_2 || ''
+    }
+  };
+
+  private templateConfig: { [key: string]: TemplateConfig } = {
+    invitation: {
+      id: import.meta.env.VITE_EMAILJS_TEMPLATE_INVITATION || 'template_invitation',
+      account: this.accounts.account1
+    },
+    accessCode: {
+      id: import.meta.env.VITE_EMAILJS_TEMPLATE_ACCESS_CODE || 'template_access_code',
+      account: this.accounts.account1
+    },
+    approval: {
+      id: import.meta.env.VITE_EMAILJS_TEMPLATE_APPROVAL || 'template_approval',
+      account: this.accounts.account2
+    }
+  };
 
   constructor() {
-    // Initialiser EmailJS
-    emailjs.init(this.publicKey);
+    // Pas d'initialisation globale, on utilisera les clés spécifiques pour chaque envoi
   }
 
-  // Méthode générique pour envoyer un email via EmailJS
+  // Méthode privée pour envoyer un email avec le bon compte
+  private async sendWithAccount(templateName: string, templateParams: any): Promise<boolean> {
+    const config = this.templateConfig[templateName];
+    
+    console.log(`🔍 [EmailService] Tentative d'envoi du template '${templateName}'`);
+    console.log(`🔍 [EmailService] Configuration:`, {
+      templateId: config?.id,
+      serviceId: config?.account?.serviceId,
+      publicKeyPresent: !!config?.account?.publicKey
+    });
+    
+    if (!config || !config.account.serviceId || !config.account.publicKey) {
+      console.error(`❌ [EmailService] Configuration manquante pour le template '${templateName}'`);
+      console.error(`❌ [EmailService] Config détaillée:`, {
+        configExists: !!config,
+        serviceId: config?.account?.serviceId || 'MANQUANT',
+        publicKey: config?.account?.publicKey || 'MANQUANT',
+        templateId: config?.id || 'MANQUANT'
+      });
+      return false;
+    }
+
+    try {
+      console.log(`📧 [EmailService] Envoi en cours...`);
+      console.log(`📧 [EmailService] Paramètres:`, {
+        serviceId: config.account.serviceId,
+        templateId: config.id,
+        to: templateParams.to_email || templateParams.user_email,
+        paramsKeys: Object.keys(templateParams)
+      });
+      
+      await emailjs.send(
+        config.account.serviceId,
+        config.id,
+        templateParams,
+        config.account.publicKey
+      );
+      console.log(`✅ [EmailService] Email '${templateName}' envoyé avec succès via EmailJS`);
+      return true;
+    } catch (error) {
+      console.error(`❌ [EmailService] Erreur lors de l'envoi de l'email '${templateName}':`, error);
+      console.error(`❌ [EmailService] Détails de l'erreur:`, {
+        message: error instanceof Error ? error.message : 'Erreur inconnue',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      return false;
+    }
+  }
+
+  // Méthode générique pour envoyer un email via EmailJS (utilise le compte 1 par défaut)
   async sendEmail(emailData: EmailData, templateId: string = 'template_general'): Promise<boolean> {
     try {
       const templateParams = {
@@ -76,7 +158,8 @@ export class EmailService {
         text_content: emailData.text || ''
       };
 
-      await emailjs.send(this.serviceId, templateId, templateParams);
+      const account = this.accounts.account1;
+      await emailjs.send(account.serviceId, templateId, templateParams, account.publicKey);
       console.log('Email envoyé avec succès via EmailJS');
       return true;
     } catch (error) {
@@ -127,95 +210,56 @@ export class EmailService {
 
   // Invitation de tiers de confiance
   async sendTrustedPartyInvitation(data: TrustedPartyInvitationData): Promise<boolean> {
-    try {
-      const templateParams = {
-        to_email: data.trustedPartyEmail,
-        to_name: data.trustedPartyName,
-        from_name: data.inviterName,
-        from_email: data.inviterEmail,
-        accept_url: data.acceptUrl,
-        expiry_date: new Date(data.expiryDate).toLocaleDateString('fr-FR'),
-        permissions: data.permissions.join(', '),
-        invitation_token: data.invitationToken,
-        // Paramètres requis par EmailJS
-        reply_to: data.inviterEmail,
-        user_email: data.trustedPartyEmail
-      };
+    const templateParams = {
+      to_email: data.trustedPartyEmail,
+      to_name: data.trustedPartyName,
+      from_name: data.inviterName,
+      from_email: data.inviterEmail,
+      accept_url: data.acceptUrl,
+      expiry_date: new Date(data.expiryDate).toLocaleDateString('fr-FR'),
+      permissions: data.permissions.join(', '),
+      invitation_token: data.invitationToken,
+      // Paramètres requis par EmailJS
+      reply_to: data.inviterEmail,
+      user_email: data.trustedPartyEmail
+    };
 
-      const invitationTemplateId = import.meta.env.VITE_EMAILJS_TEMPLATE_INVITATION || 'template_invitation';
-      await emailjs.send(
-        this.serviceId, 
-        invitationTemplateId, 
-        templateParams,
-        this.publicKey
-      );
-      console.log('Email d\'invitation envoyé avec succès via EmailJS');
-      return true;
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi de l\'email d\'invitation:', error);
-      return false;
-    }
+    return this.sendWithAccount('invitation', templateParams);
   }
 
   // Code d'accès après acceptation d'invitation
   async sendTrustedPartyAccessCode(email: string, data: TrustedPartyAcceptanceData): Promise<boolean> {
-    try {
-      const templateParams = {
-        to_email: email,
-        to_name: data.trustedPartyName,
-        from_name: data.inviterName,
-        access_code: data.accessCode,
-        permissions: data.permissions.join(', '),
-        // Paramètres requis par EmailJS
-        reply_to: 'noreply@synox.com',
-        user_email: email
-      };
+    const templateParams = {
+      to_email: email,
+      to_name: data.trustedPartyName,
+      from_name: data.inviterName,
+      access_code: data.accessCode,
+      permissions: data.permissions.join(', '),
+      // Paramètres requis par EmailJS
+      reply_to: 'noreply@synox.com',
+      user_email: email
+    };
 
-      const accessCodeTemplateId = import.meta.env.VITE_EMAILJS_TEMPLATE_ACCESS_CODE || 'template_access_code';
-      await emailjs.send(
-        this.serviceId, 
-        accessCodeTemplateId, 
-        templateParams,
-        this.publicKey
-      );
-      console.log('Email de code d\'accès envoyé avec succès via EmailJS');
-      return true;
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi de l\'email de code d\'accès:', error);
-      return false;
-    }
+    return this.sendWithAccount('accessCode', templateParams);
   }
 
   // Envoyer une demande d'approbation de retrait
   async sendWithdrawalApprovalRequest(data: WithdrawalApprovalData): Promise<boolean> {
-    try {
-      const templateParams = {
-        to_email: data.trustedPartyEmail,
-        to_name: data.trustedPartyName,
-        from_name: data.userName,
-        vault_name: data.vaultName,
-        amount: data.amount.toString(),
-        reason: data.reason,
-        approval_url: data.approvalUrl,
-        request_id: data.requestId,
-        // Paramètres requis par EmailJS
-        reply_to: 'noreply@synox.com',
-        user_email: data.trustedPartyEmail
-      };
+    const templateParams = {
+      to_email: data.trustedPartyEmail,
+      to_name: data.trustedPartyName,
+      from_name: data.userName,
+      vault_name: data.vaultName,
+      amount: data.amount.toString(),
+      reason: data.reason,
+      approval_url: data.approvalUrl,
+      request_id: data.requestId,
+      // Paramètres requis par EmailJS
+      reply_to: 'noreply@synox.com',
+      user_email: data.trustedPartyEmail
+    };
 
-      const approvalTemplateId = import.meta.env.VITE_EMAILJS_TEMPLATE_APPROVAL || 'template_approval';
-      await emailjs.send(
-        this.serviceId, 
-        approvalTemplateId, 
-        templateParams,
-        this.publicKey
-      );
-      console.log('Email de demande d\'approbation envoyé avec succès via EmailJS');
-      return true;
-    } catch (error) {
-      console.error('Erreur lors de l\'envoi de l\'email d\'approbation:', error);
-      return false;
-    }
+    return this.sendWithAccount('approval', templateParams);
   }
 
   // Template pour création de coffre

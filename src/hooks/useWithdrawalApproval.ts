@@ -12,6 +12,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import { emailService } from '../lib/emailService';
+import { KkiapayService } from '../lib/kkiapayService';
 
 export interface WithdrawalRequest {
   id: string;
@@ -76,9 +77,19 @@ export const useWithdrawalApproval = () => {
       const docRef = await addDoc(collection(db, 'withdrawalRequests'), withdrawalRequest);
 
       // Envoyer les emails aux tiers de confiance
+      console.log('🚀 [WithdrawalApproval] Envoi d\'emails aux tiers de confiance...');
+      console.log('📝 [WithdrawalApproval] Nombre de tiers de confiance:', trustedParties.length);
+      console.log('📝 [WithdrawalApproval] Liste des tiers:', trustedParties.map(tp => ({
+        name: tp.trustedPartyName,
+        email: tp.trustedPartyEmail,
+        id: tp.trustedPartyId
+      })));
+
       for (const trustedParty of trustedParties) {
         try {
-          await emailService.sendWithdrawalApprovalRequest({
+          console.log(`📧 [WithdrawalApproval] Envoi email à ${trustedParty.trustedPartyName} (${trustedParty.trustedPartyEmail})`);
+          
+          const emailData = {
             trustedPartyName: trustedParty.trustedPartyName,
             trustedPartyEmail: trustedParty.trustedPartyEmail,
             userName: 'Utilisateur SYNOX', // À remplacer par le vrai nom
@@ -87,9 +98,19 @@ export const useWithdrawalApproval = () => {
             reason,
             approvalUrl: `${window.location.origin}/approve-withdrawal?requestId=${docRef.id}&partyId=${trustedParty.trustedPartyId}`,
             requestId: docRef.id
-          });
+          };
+
+          console.log(`📧 [WithdrawalApproval] Données email:`, emailData);
+
+          const emailResult = await emailService.sendWithdrawalApprovalRequest(emailData);
+          
+          if (emailResult) {
+            console.log(`✅ [WithdrawalApproval] Email envoyé avec succès à ${trustedParty.trustedPartyEmail}`);
+          } else {
+            console.warn(`⚠️ [WithdrawalApproval] Échec d'envoi email à ${trustedParty.trustedPartyEmail}`);
+          }
         } catch (emailError) {
-          console.warn('Erreur lors de l\'envoi de l\'email à', trustedParty.trustedPartyEmail, emailError);
+          console.error(`❌ [WithdrawalApproval] Erreur lors de l'envoi de l'email à ${trustedParty.trustedPartyEmail}:`, emailError);
         }
       }
 
@@ -184,7 +205,9 @@ export const useWithdrawalApproval = () => {
   // Traiter le retrait après approbation complète
   const processWithdrawal = async (requestData: WithdrawalRequest, requestId: string): Promise<void> => {
     try {
-      // 1. Débiter le coffre
+      console.log('🚀 [ProcessWithdrawal] Début du traitement du retrait approuvé');
+      
+      // 1. Récupérer les informations du coffre
       const vaultRef = doc(db, 'vaults', requestData.vaultId);
       const vaultDoc = await getDoc(vaultRef);
       
@@ -199,13 +222,154 @@ export const useWithdrawalApproval = () => {
         throw new Error('Solde insuffisant dans le coffre');
       }
 
-      // Mettre à jour le solde du coffre
+      console.log('📊 [ProcessWithdrawal] Type de coffre:', vaultData.isGoalBased ? 'Objectif précis' : 'Épargne libre');
+
+      // 2. Débiter le coffre
       await updateDoc(vaultRef, {
         current: newBalance,
         updatedAt: Timestamp.fromDate(new Date())
       });
 
-      // 2. Mettre à jour la transaction existante
+      // 3. Traitement selon le type de coffre
+      if (vaultData.isGoalBased === false) {
+        // ÉPARGNE LIBRE → Remboursement Kkiapay
+        console.log('💰 [ProcessWithdrawal] Épargne libre - Initiation du remboursement Kkiapay');
+        await processKkiapayRefund(requestData, requestId);
+      } else {
+        // OBJECTIF PRÉCIS → Autre logique (à implémenter plus tard)
+        console.log('🎯 [ProcessWithdrawal] Objectif précis - Logique standard');
+        await processStandardWithdrawal(requestData, requestId);
+      }
+
+      console.log('✅ [ProcessWithdrawal] Retrait traité avec succès');
+
+    } catch (error) {
+      console.error('❌ [ProcessWithdrawal] Erreur lors du traitement du retrait:', error);
+      
+      // Marquer la demande comme échouée
+      await updateDoc(doc(db, 'withdrawalRequests', requestId), {
+        status: 'failed',
+        error: error instanceof Error ? error.message : 'Erreur inconnue',
+        failedAt: Timestamp.fromDate(new Date())
+      });
+      
+      throw error;
+    }
+  };
+
+  // Traitement par remboursement Kkiapay (pour épargne libre)
+  const processKkiapayRefund = async (requestData: WithdrawalRequest, requestId: string): Promise<void> => {
+    try {
+      console.log('🔄 [KkiapayRefund] Début du processus de remboursement Kkiapay');
+      
+      // 1. Rechercher la transaction de dépôt la plus récente pour ce coffre
+      const transactionsRef = collection(db, 'transactions');
+      const q = query(
+        transactionsRef,
+        where('vaultId', '==', requestData.vaultId),
+        where('userId', '==', requestData.userId),
+        where('type', '==', 'Versement'),
+        where('status', '==', 'active'),
+        where('paymentMethod', '==', 'Momo')
+      );
+      
+      const transactionSnapshot = await getDocs(q);
+      
+      if (transactionSnapshot.empty) {
+        console.warn('⚠️ [KkiapayRefund] Aucune transaction Kkiapay trouvée pour remboursement');
+        // Fallback vers traitement standard
+        await processStandardWithdrawal(requestData, requestId);
+        return;
+      }
+
+      // Prendre la transaction la plus récente
+      const transactions = transactionSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      
+      // Trier par date de création (plus récent en premier)
+      transactions.sort((a: any, b: any) => {
+        const dateA = a.createdAt?.toDate?.() || new Date(a.createdAt);
+        const dateB = b.createdAt?.toDate?.() || new Date(b.createdAt);
+        return dateB.getTime() - dateA.getTime();
+      });
+
+      const latestTransaction = transactions[0];
+      console.log('📋 [KkiapayRefund] Transaction trouvée pour remboursement:', {
+        transactionId: latestTransaction.id_transaction,
+        amount: latestTransaction.montant,
+        date: latestTransaction.createdAt
+      });
+
+      // 2. Effectuer le remboursement via Kkiapay
+      const refundResult = await KkiapayService.refundTransaction({
+        transactionId: latestTransaction.id_transaction,
+        amount: requestData.amount,
+        reason: requestData.reason,
+        userEmail: '', // TODO: Récupérer l'email utilisateur
+        vaultId: requestData.vaultId
+      });
+
+      if (refundResult.success) {
+        console.log('✅ [KkiapayRefund] Remboursement Kkiapay réussi:', refundResult.refundId);
+        
+        // 3. Mettre à jour la transaction originale
+        await updateDoc(doc(db, 'transactions', latestTransaction.id), {
+          status: 'refunded',
+          refundId: refundResult.refundId,
+          refundedAt: Timestamp.fromDate(new Date()),
+          refundReason: requestData.reason
+        });
+
+        // 4. Créer une nouvelle transaction de remboursement
+        await addDoc(collection(db, 'transactions'), {
+          createdAt: Timestamp.fromDate(new Date()),
+          id_transaction: refundResult.refundId || `refund_${requestId}`,
+          montant: -requestData.amount, // Négatif pour un remboursement
+          paymentMethod: 'Remboursement Kkiapay',
+          status: 'completed',
+          type: 'Remboursement',
+          userId: requestData.userId,
+          vaultId: requestData.vaultId,
+          reference: `Remboursement Kkiapay - ${requestData.reason}`,
+          withdrawalRequestId: requestId,
+          originalTransactionId: latestTransaction.id
+        });
+
+        // 5. Finaliser la demande de retrait
+        await updateDoc(doc(db, 'withdrawalRequests', requestId), {
+          status: 'completed',
+          processedAt: Timestamp.fromDate(new Date()),
+          refundMethod: 'kkiapay',
+          refundId: refundResult.refundId
+        });
+
+        console.log('✅ [KkiapayRefund] Processus de remboursement Kkiapay terminé avec succès');
+
+      } else {
+        console.error('❌ [KkiapayRefund] Échec du remboursement Kkiapay:', refundResult.error);
+        
+        // En cas d'échec, fallback vers traitement standard
+        console.log('🔄 [KkiapayRefund] Fallback vers traitement standard');
+        await processStandardWithdrawal(requestData, requestId);
+      }
+      
+    } catch (error) {
+      console.error('❌ [KkiapayRefund] Erreur lors du remboursement Kkiapay:', error);
+      
+      // En cas d'erreur, fallback vers traitement standard
+      console.log('🔄 [KkiapayRefund] Fallback vers traitement standard après erreur');
+      await processStandardWithdrawal(requestData, requestId);
+    }
+  };
+
+  // Traitement standard (pour objectif précis)
+  const processStandardWithdrawal = async (requestData: WithdrawalRequest, requestId: string): Promise<void> => {
+    try {
+      console.log('📝 [StandardWithdrawal] Mise à jour des transactions...');
+      
+      // Mettre à jour la transaction existante
       if (requestData.transactionId) {
         await updateDoc(doc(db, 'transactions', requestData.transactionId), {
           status: 'completed',
@@ -229,24 +393,16 @@ export const useWithdrawalApproval = () => {
         });
       }
 
-      // 3. Mettre à jour le statut de la demande
+      // Finaliser la demande de retrait
       await updateDoc(doc(db, 'withdrawalRequests', requestId), {
         status: 'completed',
         processedAt: Timestamp.fromDate(new Date())
       });
 
-      console.log(`Retrait de ${requestData.amount}€ traité avec succès pour le coffre ${requestData.vaultId}`);
+      console.log('✅ [StandardWithdrawal] Retrait standard traité avec succès');
 
     } catch (error) {
-      console.error('Erreur lors du traitement du retrait:', error);
-      
-      // Marquer la demande comme échouée
-      await updateDoc(doc(db, 'withdrawalRequests', requestId), {
-        status: 'failed',
-        error: error instanceof Error ? error.message : 'Erreur inconnue',
-        failedAt: Timestamp.fromDate(new Date())
-      });
-      
+      console.error('❌ [StandardWithdrawal] Erreur lors du traitement standard:', error);
       throw error;
     }
   };

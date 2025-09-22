@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore";
-import { db, auth } from "../firebase/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { useTransactionStats } from '../hooks/useTransactionStats';
 import { 
   CreditCard,
   Search,
@@ -18,7 +16,12 @@ import {
   ShoppingBag,
   Smartphone,
   Vault,
-  MoreHorizontal
+  MoreHorizontal,
+  TrendingUp,
+  TrendingDown,
+  RefreshCw,
+  BarChart3,
+  PieChart
 } from 'lucide-react';
  
  
@@ -35,67 +38,83 @@ export default function Transactions({ onLogout }: TransactionsProps) {
   });
   const [filterType, setFilterType] = useState('all');
   const [dateRange, setDateRange] = useState('30days');
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const { stats, transactions, loading, error, refreshStats } = useTransactionStats();
 
 
-  useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        console.log("Utilisateur connecté :", user.uid);
-  
-        // const q = query(
-        //   collection(db, "transactions"),
-        //  where("userId", "==", user.uid),
-        //  orderBy("createdAt", "desc")
-
-        // );
-        const q = query(
-          collection(db, "transactions"),
-          where("userId", "==", auth.currentUser.uid),
-         
-        );
-        
-        const unsubscribeTransactions = onSnapshot(q, (snapshot) => {
-          const results: any[] = [];
-          snapshot.forEach((doc) => results.push({ id: doc.id, ...doc.data() }));
-          console.log("Transactions récupérées :", results);
-          setTransactions(results);
-        }, (error) => {
-          console.error("Erreur Firestore :", error);
-        });
-  
-        return () => unsubscribeTransactions(); // nettoyage snapshot
-      } else {
-        console.log("Pas d'utilisateur connecté");
-        setTransactions([]); // vide le tableau si déconnecté
-      }
+  // Listen for dark mode changes
+  React.useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setDarkMode(document.documentElement.classList.contains('dark'));
     });
-  
-    return () => unsubscribeAuth(); // nettoyage listener auth
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
   }, []);
-  
-// Filtrage
-const filteredTransactions = transactions.filter(transaction => {
-  if (filterType === 'all') return true;
-  return transaction.type === filterType;
-});
 
-// Totaux
-const totalIncome = transactions
-  .filter(t => t.type === "Revenus" || t.type === "income")
-  .reduce((sum, t) => sum + (t.montant || 0), 0);
+  // Affichage du loading
+  if (loading) {
+    return (
+      <Layout onLogout={onLogout}>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <RefreshCw className="w-12 h-12 animate-spin text-amber-500 mx-auto mb-4" />
+              <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                Chargement des transactions...
+              </p>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
-const totalExpenses = Math.abs(
-  transactions
-    .filter(t => t.type === "Dépense" || t.type === "expense")
-    .reduce((sum, t) => sum + (t.montant || 0), 0)
-);
+  // Affichage de l'erreur
+  if (error) {
+    return (
+      <Layout onLogout={onLogout}>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <TrendingDown className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Erreur de chargement</h3>
+              <p className={`text-sm mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                {error}
+              </p>
+              <button
+                onClick={refreshStats}
+                className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+              >
+                Réessayer
+              </button>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
-const totalSavings = Math.abs(
-  transactions
-    .filter(t => t.type === "Épargne" || t.type === "vault")
-    .reduce((sum, t) => sum + (t.montant || 0), 0)
-);
+  // Utiliser les vraies données ou des valeurs par défaut
+  const data = stats || {
+    totalDeposits: 0,
+    totalWithdrawals: 0,
+    totalRefunds: 0,
+    netBalance: 0,
+    depositsCount: 0,
+    withdrawalsCount: 0,
+    refundsCount: 0,
+    totalTransactions: 0,
+    averageDeposit: 0,
+    averageWithdrawal: 0,
+    averageTransaction: 0,
+    thisMonth: { deposits: 0, withdrawals: 0, count: 0 },
+    lastMonth: { deposits: 0, withdrawals: 0, count: 0 },
+    byPaymentMethod: {},
+    byType: {},
+    recentTransactions: [],
+    monthlyTrend: []
+  };
 
 const cardClasses = darkMode 
   ? 'bg-gray-800 border-gray-700 text-white' 
@@ -106,7 +125,7 @@ const cardClasses = darkMode
       <div className="p-4 sm:p-6 lg:p-8">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
             <div>
               <h1 className="text-3xl sm:text-4xl font-poly font-bold mb-2">
                 Historique des Transactions
@@ -115,10 +134,23 @@ const cardClasses = darkMode
                 Suivez tous vos mouvements financiers en détail
               </p>
             </div>
-            <button className="flex items-center px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poly font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 mt-4 sm:mt-0">
-              <Download className="w-5 h-5 mr-2" />
-              Exporter
-            </button>
+            <div className="flex items-center space-x-3 mt-4 sm:mt-0">
+              <button
+                onClick={refreshStats}
+                className={`p-2.5 rounded-xl transition-all duration-300 ${
+                  darkMode 
+                    ? 'text-blue-400 hover:bg-gray-700 bg-gray-700/50' 
+                    : 'text-blue-600 hover:bg-blue-50 bg-blue-50/50'
+                }`}
+                title="Actualiser les transactions"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
+              <button className="flex items-center px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poly font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105">
+                <Download className="w-5 h-5 mr-2" />
+                Exporter
+              </button>
+            </div>
           </div>
 
           {/* Filters */}
@@ -167,19 +199,19 @@ const cardClasses = darkMode
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl ${cardClasses}`}>
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-xl flex items-center justify-center">
                 <ArrowUpRight className="w-6 h-6 text-white" />
               </div>
-              <ArrowUpRight className="w-5 h-5 text-emerald-500" />
+              <TrendingUp className="w-5 h-5 text-emerald-500" />
             </div>
             <h3 className="font-poly font-bold text-2xl mb-1 text-emerald-600 dark:text-emerald-400">
-              +{totalIncome.toLocaleString()} €
+              +{data.totalDeposits.toLocaleString()} CFA
             </h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Total des revenus
+              Total versements ({data.depositsCount})
             </p>
           </div>
 
@@ -188,28 +220,47 @@ const cardClasses = darkMode
               <div className="w-12 h-12 bg-gradient-to-br from-red-400 to-red-500 rounded-xl flex items-center justify-center">
                 <ArrowDownRight className="w-6 h-6 text-white" />
               </div>
-              <ArrowDownRight className="w-5 h-5 text-red-500" />
+              <TrendingDown className="w-5 h-5 text-red-500" />
             </div>
             <h3 className="font-poly font-bold text-2xl mb-1 text-red-600 dark:text-red-400">
-              -{totalExpenses.toLocaleString()} €
+              -{data.totalWithdrawals.toLocaleString()} CFA
             </h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Total des dépenses
+              Total retraits ({data.withdrawalsCount})
             </p>
           </div>
 
           <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl ${cardClasses}`}>
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-500 rounded-xl flex items-center justify-center">
-                <Vault className="w-6 h-6 text-white" />
+                <DollarSign className="w-6 h-6 text-white" />
               </div>
-              <ArrowUpRight className="w-5 h-5 text-blue-500" />
+              <TrendingUp className={`w-5 h-5 ${data.netBalance >= 0 ? 'text-emerald-500' : 'text-red-500'}`} />
             </div>
-            <h3 className="font-poly font-bold text-2xl mb-1 text-blue-600 dark:text-blue-400">
-              +{totalSavings.toLocaleString()} €
+            <h3 className={`font-poly font-bold text-2xl mb-1 ${
+              data.netBalance >= 0 
+                ? 'text-emerald-600 dark:text-emerald-400' 
+                : 'text-red-600 dark:text-red-400'
+            }`}>
+              {data.netBalance >= 0 ? '+' : ''}{data.netBalance.toLocaleString()} CFA
             </h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Total épargné
+              Solde net
+            </p>
+          </div>
+
+          <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl ${cardClasses}`}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-500 rounded-xl flex items-center justify-center">
+                <BarChart3 className="w-6 h-6 text-white" />
+              </div>
+              <BarChart3 className="w-5 h-5 text-purple-500" />
+            </div>
+            <h3 className="font-poly font-bold text-2xl mb-1 text-purple-600 dark:text-purple-400">
+              {data.totalTransactions}
+            </h3>
+            <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Total transactions
             </p>
           </div>
         </div>

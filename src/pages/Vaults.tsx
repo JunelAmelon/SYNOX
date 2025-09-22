@@ -81,6 +81,30 @@ const { createWithdrawalRequest } = useWithdrawalApproval();
 const { trustedParties } = useTrustedThirdParties();
 const vaultsPerPage = 3;
 
+// Fonction pour vérifier si l'approbation des tiers est nécessaire
+const checkIfApprovalNeeded = (vaultData: any, currentAmount: number): boolean => {
+  // Approbation requise si :
+  // 1. Le coffre est verrouillé ET la date de déverrouillage n'est pas atteinte
+  // 2. OU l'objectif n'est pas encore atteint (pour les coffres avec objectif)
+  
+  if (vaultData.isLocked && vaultData.unlockDate) {
+    const unlockDate = new Date(vaultData.unlockDate);
+    const now = new Date();
+    if (now < unlockDate) {
+      console.log('🔒 [ApprovalCheck] Coffre verrouillé jusqu\'au', unlockDate.toLocaleDateString());
+      return true;
+    }
+  }
+  
+  if (vaultData.target && currentAmount < vaultData.target) {
+    console.log('🎯 [ApprovalCheck] Objectif non atteint:', `${currentAmount}/${vaultData.target}`);
+    return true;
+  }
+  
+  console.log('✅ [ApprovalCheck] Retrait libre autorisé');
+  return false;
+};
+
 // Listen for dark mode changes
 React.useEffect(() => {
 const observer = new MutationObserver(() => {
@@ -202,74 +226,170 @@ showError("Impossible d'effectuer le dépôt. Réessayez plus tard.");
 const handleWithdrawFromModal = async (amount: number, reason: string) => {
 if (!selectedVault || !auth.currentUser) return;
 
+console.log('🚀 [RETRAIT] ========== DÉBUT DU PROCESSUS DE RETRAIT ==========');
+console.log('💰 [RETRAIT] Montant demandé:', amount, 'CFA');
+console.log('📝 [RETRAIT] Raison:', reason);
+console.log('🏦 [RETRAIT] Coffre sélectionné:', selectedVault.name, '(ID:', selectedVault.id, ')');
+console.log('👤 [RETRAIT] Utilisateur:', auth.currentUser.email);
+
 try {
+console.log('📋 [RETRAIT] Récupération des données du coffre...');
 const vaultRef = doc(db, "vaults", selectedVault.id);
 const vaultSnap = await getDoc(vaultRef);
 
 if (!vaultSnap.exists()) {
+console.error('❌ [RETRAIT] Coffre introuvable dans la base de données');
 showError("Coffre introuvable !");
 return;
 }
 
-let current = vaultSnap.data().current;
+const vaultData = vaultSnap.data();
+let current = vaultData.current;
 if (typeof current !== "number") current = 0;
 
+console.log('💳 [RETRAIT] Solde actuel du coffre:', current, 'CFA');
+console.log('🎯 [RETRAIT] Objectif du coffre:', vaultData.target || 'Aucun', 'CFA');
+console.log('📊 [RETRAIT] Type de coffre:', vaultData.isGoalBased ? 'Objectif précis' : 'Épargne libre');
+console.log('🔒 [RETRAIT] Statut verrouillage:', vaultData.isLocked ? 'Verrouillé' : 'Déverrouillé');
+
 if (amount > current) {
+console.error('❌ [RETRAIT] Montant supérieur au solde disponible');
+console.error('❌ [RETRAIT] Demandé:', amount, 'CFA | Disponible:', current, 'CFA');
 showError("Montant supérieur au solde disponible !");
 return;
 }
 
-// Récupérer les tiers de confiance actifs avec permission d'approbation
-const activeTrustedParties = trustedParties.filter(tp => 
-  tp.status === 'active' && 
-  tp.permissions.includes('approve_withdrawals')
-);
+console.log('✅ [RETRAIT] Vérification du solde : OK');
+console.log('🔍 [RETRAIT] Analyse des conditions de retrait...');
 
-if (activeTrustedParties.length < 2) {
-showError("Vous devez avoir au moins 2 tiers de confiance actifs avec permission d'approbation pour effectuer un retrait.");
-return;
+// Vérifier si l'approbation des tiers est nécessaire
+const needsApproval = checkIfApprovalNeeded(vaultData, current);
+console.log('🔐 [RETRAIT] Résultat analyse approbation:', needsApproval ? 'APPROBATION REQUISE' : 'RETRAIT LIBRE');
+
+if (needsApproval) {
+  // CAS 1: APPROBATION REQUISE - Demande aux tiers de confiance
+  console.log('🔐 [RETRAIT] ========== CAS 1: APPROBATION REQUISE ==========');
+  console.log('📧 [RETRAIT] Recherche des tiers de confiance actifs...');
+  
+  // Récupérer les tiers de confiance actifs avec permission d'approbation
+  const activeTrustedParties = trustedParties.filter(tp => 
+    tp.status === 'active' && 
+    tp.permissions.includes('approve_withdrawals')
+  );
+
+  console.log('👥 [RETRAIT] Tiers de confiance trouvés:', activeTrustedParties.length);
+  console.log('👥 [RETRAIT] Détails des tiers:', activeTrustedParties.map(tp => ({
+    name: tp.name,
+    email: tp.email,
+    status: tp.status
+  })));
+
+  if (activeTrustedParties.length < 2) {
+    console.error('❌ [RETRAIT] Pas assez de tiers de confiance actifs');
+    console.error('❌ [RETRAIT] Requis: 2 | Disponibles:', activeTrustedParties.length);
+    showError(`Vous devez avoir au moins 2 tiers de confiance actifs avec permission d'approbation pour effectuer un retrait. Actuellement: ${activeTrustedParties.length} tiers valides sur ${trustedParties.length} total.`);
+    return;
+  }
+
+  // Prendre les 2 premiers tiers de confiance
+  const selectedTrustedParties = activeTrustedParties.slice(0, 2).map(tp => ({
+    trustedPartyId: tp.id,
+    trustedPartyName: tp.name,
+    trustedPartyEmail: tp.email,
+    accessCode: ''
+  }));
+
+  console.log('✅ [RETRAIT] Tiers sélectionnés pour approbation:', selectedTrustedParties.map(tp => tp.trustedPartyName));
+  console.log('📤 [RETRAIT] Création de la demande de retrait...');
+
+  // Créer une demande de retrait avec approbation
+  const requestId = await createWithdrawalRequest(
+    auth.currentUser.uid,
+    selectedVault.id,
+    selectedVault.name,
+    amount,
+    reason,
+    selectedTrustedParties
+  );
+
+  console.log('✅ [RETRAIT] Demande créée avec ID:', requestId);
+  console.log('💾 [RETRAIT] Création de la transaction en attente...');
+
+  // Créer une transaction de retrait en attente
+  const transactionRef = await createTransaction({
+    amount: -amount,
+    paymentMethod: "En attente d'approbation",
+    status: "pending",
+    type: "Retrait",
+    userId: auth.currentUser.uid,
+    vaultId: selectedVault.id,
+    reference: `Demande-${requestId}`,
+    reason: reason
+  });
+
+  console.log('✅ [RETRAIT] Transaction créée avec ID:', transactionRef.id);
+  console.log('🔗 [RETRAIT] Liaison demande-transaction...');
+
+  // Enregistrer l'ID de la transaction dans la demande de retrait
+  await updateDoc(doc(db, 'withdrawalRequests', requestId), {
+    transactionId: transactionRef.id
+  });
+
+  console.log('✅ [RETRAIT] Processus d\'approbation terminé avec succès');
+  console.log('📧 [RETRAIT] Les tiers de confiance vont recevoir des emails d\'approbation');
+  warning(`Demande de retrait de ${amount} CFA créée. En attente d'approbation des tiers de confiance.`);
+
+} else {
+  // CAS 2: RETRAIT LIBRE - Traitement direct selon le type de coffre
+  console.log('🆓 [RETRAIT] ========== CAS 2: RETRAIT LIBRE ==========');
+  console.log('🔍 [RETRAIT] Détermination du type de traitement...');
+  
+  if (vaultData.isGoalBased === false) {
+    // ÉPARGNE LIBRE → Remboursement Kkiapay
+    console.log('💰 [RETRAIT] Type: ÉPARGNE LIBRE → Remboursement Kkiapay');
+    console.log('🔄 [RETRAIT] Recherche de transaction Kkiapay à rembourser...');
+    // TODO: Implémenter le remboursement Kkiapay direct
+    console.warn('⚠️ [RETRAIT] Remboursement Kkiapay pas encore implémenté pour retrait direct');
+    showError("Remboursement Kkiapay en cours d'implémentation pour les coffres d'épargne libre");
+  } else {
+    // OBJECTIF PRÉCIS → Retrait standard direct
+    console.log('🎯 [RETRAIT] Type: OBJECTIF PRÉCIS → Retrait standard direct');
+    console.log('💳 [RETRAIT] Débit du coffre en cours...');
+    
+    // Débiter directement le coffre
+    await updateDoc(vaultRef, {
+      current: current - amount,
+      updatedAt: new Date()
+    });
+
+    console.log('✅ [RETRAIT] Coffre débité:', current, '→', (current - amount), 'CFA');
+    console.log('💾 [RETRAIT] Création de la transaction de retrait...');
+
+    // Créer la transaction de retrait
+    await createTransaction({
+      amount: -amount,
+      paymentMethod: "Retrait libre",
+      status: "completed",
+      type: "Retrait",
+      userId: auth.currentUser.uid,
+      vaultId: selectedVault.id,
+      reference: "Retrait libre - objectif atteint",
+      reason: reason
+    });
+
+    console.log('✅ [RETRAIT] Transaction de retrait créée');
+    console.log('🎉 [RETRAIT] Retrait libre terminé avec succès');
+    success(`Retrait de ${amount} CFA effectué avec succès !`);
+  }
 }
 
-// Prendre les 2 premiers tiers de confiance (ou implémenter une logique de sélection)
-const selectedTrustedParties = activeTrustedParties.slice(0, 2).map(tp => ({
-  trustedPartyId: tp.id,
-  trustedPartyName: tp.name,
-  trustedPartyEmail: tp.email,
-  accessCode: '' // Le code sera vérifié lors de l'approbation
-}));
-
-// Créer une demande de retrait au lieu d'effectuer le retrait directement
-const requestId = await createWithdrawalRequest(
-  auth.currentUser.uid,
-  selectedVault.id,
-  selectedVault.name,
-  amount,
-  reason,
-  selectedTrustedParties
-);
-
-// Créer une transaction de retrait en attente
-const transactionRef = await createTransaction({
-amount: -amount,
-paymentMethod: "En attente d'approbation",
-status: "pending",
-type: "Retrait",
-userId: auth.currentUser.uid,
-vaultId: selectedVault.id,
-reference: `Demande-${requestId}`,
-reason: reason
-});
-
-// Enregistrer l'ID de la transaction dans la demande de retrait
-await updateDoc(doc(db, 'withdrawalRequests', requestId), {
-transactionId: transactionRef.id
-});
-
+console.log('🏁 [RETRAIT] ========== FIN DU PROCESSUS DE RETRAIT ==========');
 setOpenMenuId(null);
-warning(`Demande de retrait de ${amount}€ créée. En attente d'approbation des tiers de confiance.`);
 } catch (err) {
-console.error("Erreur lors de la demande de retrait :", err);
-showError("Impossible de créer la demande de retrait. Réessayez plus tard.");
+console.error('💥 [RETRAIT] ========== ERREUR CRITIQUE ==========');
+console.error('❌ [RETRAIT] Détails de l\'erreur:', err);
+console.error('❌ [RETRAIT] Stack trace:', err instanceof Error ? err.stack : 'Pas de stack trace');
+showError("Impossible de traiter le retrait. Réessayez plus tard.");
 }
 };
 
@@ -476,7 +596,7 @@ Nouveau Coffre
         </div>
         <select
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
+          onChange={(e) => setFilterStatus(e.target.value as "all" | "active" | "locked" | "completed")}
           className={`px-4 py-2 rounded-xl border transition-colors ${
             darkMode 
               ? 'bg-gray-800 border-gray-600 text-white' 
@@ -590,13 +710,13 @@ Nouveau Coffre
                         <div className="text-center">
                           <div className="text-green-300 text-xs mb-1 font-mono">SOLDE DISPONIBLE</div>
                           <div className="text-green-200 text-lg font-bold mb-1 font-mono">
-                            {vault.current.toLocaleString()}€
+                            {vault.current.toLocaleString()} CFA
                           </div>
                           {vault.target && (
                             <>
                               <div className="text-green-400 text-xs mb-1 font-mono">OBJECTIF</div>
                               <div className="text-green-300 text-sm font-bold font-mono">
-                                {vault.target.toLocaleString()}€
+                                {vault.target.toLocaleString()} CFA
                               </div>
                             </>
                           )}
@@ -637,7 +757,7 @@ Nouveau Coffre
                             <div>
                               <div className="text-xs text-amber-700 font-bold">OBJECTIF</div>
                               <div className="text-sm text-amber-800 font-bold">
-                                {vault.target ? `${vault.target.toLocaleString()}€` : 'Libre'}
+                                {vault.target ? `${vault.target.toLocaleString()} CFA` : 'Libre'}
                               </div>
                             </div>
                           </div>

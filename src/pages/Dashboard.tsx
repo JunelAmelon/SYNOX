@@ -344,7 +344,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               </div>
             </div>
             <h3 className="font-poppins font-bold text-3xl mb-1">
-              {showBalance ? `${totalBalance.toLocaleString()} €` : '••••• €'}
+              {showBalance ? `${totalBalance.toLocaleString()} CFA` : '••••• CFA'}
             </h3>
             <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Solde total disponible
@@ -360,7 +360,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               <ArrowUpRight className="w-5 h-5 text-blue-500" />
             </div>
             <h3 className="font-poppins font-bold text-3xl mb-1">
-              {showBalance ? `${totalInVaults.toLocaleString()} €` : '••••• €'}
+              {showBalance ? `${totalInVaults.toLocaleString()} CFA` : '••••• CFA'}
             </h3>
             <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Total dans les coffres
@@ -376,7 +376,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               <ArrowDownRight className="w-5 h-5 text-red-500" />
             </div>
             <h3 className="font-poppins font-bold text-3xl mb-1">
-              {expensesThisMonth.toLocaleString()} €
+              {expensesThisMonth.toLocaleString()} CFA
             </h3>
             <p className={`text-sm mb-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Dépenses ce mois
@@ -440,9 +440,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                             </h3>
                             <p className={`text-xs sm:text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'} truncate`}>
                               {vault.isGoalBased && vault.monthlyContrib 
-                                ? `${vault.monthlyContrib}€/mois • ${vault.daysLeft} jours restants`
+                                ? `${vault.monthlyContrib}CFA/mois • ${vault.daysLeft} jours restants`
                                 : vault.isGoalBased 
-                                  ? `Objectif: ${vault.target?.toLocaleString()}€`
+                                  ? `Objectif: ${vault.target?.toLocaleString()}CFA`
                                   : 'Épargne libre'
                               }
                             </p>
@@ -454,10 +454,10 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                           {vault.target ? (
                             <>
                               <p className="font-poppins font-bold text-base sm:text-lg leading-tight">
-                                <span className="block sm:inline">{vault.current.toLocaleString()} €</span>
+                                <span className="block sm:inline">{vault.current.toLocaleString()} CFA</span>
                                 <span className="hidden sm:inline"> / </span>
                                 <span className="block sm:inline text-sm sm:text-base text-gray-500">
-                                  {vault.target.toLocaleString()} €
+                                  {vault.target.toLocaleString()} CFA
                                 </span>
                               </p>
                               <p className={`text-xs sm:text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
@@ -467,7 +467,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                           ) : (
                             <>
                               <p className="font-poppins font-bold text-base sm:text-lg">
-                                {vault.current.toLocaleString()} €
+                                {vault.current.toLocaleString()} CFA
                               </p>
                               <p className={`text-xs sm:text-sm mt-1 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                                 Épargne libre
@@ -489,9 +489,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                             ></div>
                           </div>
                           <div className="flex justify-between mt-1 sm:mt-2 text-xs">
-                            <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>0€</span>
+                            <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>0CFA</span>
                             <span className={darkMode ? 'text-gray-400' : 'text-gray-500'}>
-                              {vault.target.toLocaleString()}€
+                              {vault.target.toLocaleString()}CFA
                             </span>
                           </div>
                         </div>
@@ -601,7 +601,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
                           <p className={`font-poppins font-bold text-xs sm:text-sm ${
                             transaction.montant > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
                           }`}>
-                            {transaction.montant > 0 ? '+' : ''}{Math.abs(transaction.montant).toLocaleString()} €
+                            {transaction.montant > 0 ? '+' : ''}{Math.abs(transaction.montant).toLocaleString()} CFA
                           </p>
                           <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                             {transaction.createdAt?.toDate?.().toLocaleDateString('fr-FR') || 'Date inconnue'}

@@ -216,6 +216,8 @@ export function useTrustedThirdParties() {
 
       // Envoyer l'email d'invitation
       try {
+        console.log('🚀 [TrustedParties] Préparation de l\'envoi d\'email d\'invitation...');
+        
         const invitationData: TrustedPartyInvitationData = {
           inviterName: currentUser.displayName || currentUser.email || 'Utilisateur SYNOX',
           inviterEmail: currentUser.email || '',
@@ -227,10 +229,22 @@ export function useTrustedThirdParties() {
           expiryDate: invitationExpiry.toISOString(),
         };
 
-        await emailService.sendTrustedPartyInvitation(invitationData);
-        console.log('Email d\'invitation envoyé avec succès');
+        console.log('📝 [TrustedParties] Données d\'invitation:', {
+          inviterName: invitationData.inviterName,
+          trustedPartyEmail: invitationData.trustedPartyEmail,
+          acceptUrl: invitationData.acceptUrl,
+          permissions: invitationData.permissions
+        });
+
+        const emailResult = await emailService.sendTrustedPartyInvitation(invitationData);
+        
+        if (emailResult) {
+          console.log('✅ [TrustedParties] Email d\'invitation envoyé avec succès');
+        } else {
+          console.warn('⚠️ [TrustedParties] L\'envoi d\'email a échoué mais n\'a pas levé d\'erreur');
+        }
       } catch (emailError) {
-        console.error('Erreur lors de l\'envoi de l\'email d\'invitation:', emailError);
+        console.error('❌ [TrustedParties] Erreur lors de l\'envoi de l\'email d\'invitation:', emailError);
         // Ne pas faire échouer la création si l'email échoue
       }
 

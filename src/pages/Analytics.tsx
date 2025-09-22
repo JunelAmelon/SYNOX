@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Layout from '../components/Layout';
+import { useAnalytics } from '../hooks/useAnalytics';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -10,7 +11,10 @@ import {
   Activity,
   DollarSign,
   Percent,
-  Clock
+  Clock,
+  RefreshCw,
+  Vault,
+  CreditCard
 } from 'lucide-react';
 
 interface AnalyticsProps {
@@ -25,6 +29,7 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
     return false;
   });
   const [timeRange, setTimeRange] = useState('6months');
+  const { analytics, loading, error, refreshAnalytics } = useAnalytics();
 
   // Listen for dark mode changes
   React.useEffect(() => {
@@ -39,13 +44,68 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
     ? 'bg-gray-800 border-gray-700 text-white' 
     : 'bg-white border-gray-200 text-gray-900';
 
-  const analyticsData = {
-    totalSaved: 30200,
-    monthlyGrowth: 12.5,
-    averageContribution: 1150,
-    completionRate: 67,
-    bestPerformingVault: 'Coffre Voyage Europe',
-    savingsVelocity: 8.3
+  // Affichage du loading
+  if (loading) {
+    return (
+      <Layout onLogout={onLogout}>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <RefreshCw className="w-12 h-12 animate-spin text-amber-500 mx-auto mb-4" />
+              <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                Calcul des statistiques en cours...
+              </p>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Affichage de l'erreur
+  if (error) {
+    return (
+      <Layout onLogout={onLogout}>
+        <div className="p-4 sm:p-6 lg:p-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <TrendingDown className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Erreur de chargement</h3>
+              <p className={`text-sm mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                {error}
+              </p>
+              <button
+                onClick={refreshAnalytics}
+                className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+              >
+                Réessayer
+              </button>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Utiliser les vraies données ou des valeurs par défaut
+  const data = analytics || {
+    totalSaved: 0,
+    totalVaults: 0,
+    activeVaults: 0,
+    completedVaults: 0,
+    totalDeposits: 0,
+    totalWithdrawals: 0,
+    totalTransactions: 0,
+    averageTransactionAmount: 0,
+    monthlyGrowth: 0,
+    averageContribution: 0,
+    completionRate: 0,
+    bestPerformingVault: 'Aucun',
+    vaultsByType: {},
+    transactionsByType: {},
+    monthlyData: []
   };
 
   const monthlyData = [
@@ -78,20 +138,33 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
                 Suivez vos performances d'épargne et optimisez vos stratégies
               </p>
             </div>
-            <select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
-              className={`px-4 py-2 rounded-xl border transition-colors mt-4 sm:mt-0 ${
-                darkMode 
-                  ? 'bg-gray-800 border-gray-600 text-white' 
-                  : 'bg-white border-stone-200 text-gray-900'
-              }`}
-            >
-              <option value="1month">1 mois</option>
-              <option value="3months">3 mois</option>
-              <option value="6months">6 mois</option>
-              <option value="1year">1 an</option>
-            </select>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={refreshAnalytics}
+                className={`p-2.5 rounded-xl transition-all duration-300 ${
+                  darkMode 
+                    ? 'text-blue-400 hover:bg-gray-700 bg-gray-700/50' 
+                    : 'text-blue-600 hover:bg-blue-50 bg-blue-50/50'
+                }`}
+                title="Actualiser les statistiques"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
+              <select
+                value={timeRange}
+                onChange={(e) => setTimeRange(e.target.value)}
+                className={`px-4 py-2 rounded-xl border transition-colors mt-4 sm:mt-0 ${
+                  darkMode 
+                    ? 'bg-gray-800 border-gray-600 text-white' 
+                    : 'bg-white border-stone-200 text-gray-900'
+                }`}
+              >
+                <option value="1month">1 mois</option>
+                <option value="3months">3 mois</option>
+                <option value="6months">6 mois</option>
+                <option value="1year">1 an</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -105,7 +178,7 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
               <TrendingUp className="w-5 h-5 text-emerald-500" />
             </div>
             <h3 className="font-poly font-bold text-2xl mb-1">
-              {analyticsData.totalSaved.toLocaleString()} €
+              {data.totalSaved.toLocaleString()} CFA
             </h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Total épargné
@@ -120,7 +193,7 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
               <TrendingUp className="w-5 h-5 text-emerald-500" />
             </div>
             <h3 className="font-poly font-bold text-2xl mb-1">
-              +{analyticsData.monthlyGrowth}%
+              {data.monthlyGrowth > 0 ? '+' : ''}{data.monthlyGrowth.toFixed(1)}%
             </h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Croissance mensuelle
@@ -134,7 +207,7 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
               </div>
             </div>
             <h3 className="font-poly font-bold text-2xl mb-1">
-              {analyticsData.averageContribution} €
+              {data.averageContribution.toLocaleString()} CFA
             </h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Contribution moyenne
@@ -148,7 +221,7 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
               </div>
             </div>
             <h3 className="font-poly font-bold text-2xl mb-1">
-              {analyticsData.completionRate}%
+              {data.completionRate.toFixed(0)}%
             </h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Taux de réalisation
@@ -158,28 +231,28 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
           <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl ${cardClasses}`}>
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-pink-500 rounded-xl flex items-center justify-center">
-                <Activity className="w-6 h-6 text-white" />
+                <Vault className="w-6 h-6 text-white" />
               </div>
             </div>
             <h3 className="font-poly font-bold text-2xl mb-1">
-              {analyticsData.savingsVelocity}
+              {data.totalVaults}
             </h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Vélocité d'épargne
+              Total coffres
             </p>
           </div>
 
           <div className={`rounded-2xl p-6 border transition-all duration-300 hover:shadow-xl ${cardClasses}`}>
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-gradient-to-br from-indigo-400 to-indigo-500 rounded-xl flex items-center justify-center">
-                <Clock className="w-6 h-6 text-white" />
+                <CreditCard className="w-6 h-6 text-white" />
               </div>
             </div>
             <h3 className="font-poly font-bold text-lg mb-1">
-              8 mois
+              {data.totalTransactions}
             </h3>
             <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Temps moyen objectif
+              Total transactions
             </p>
           </div>
         </div>
