@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../contexts/ThemeContext';
-import { db, auth } from "../firebase/firebase";
+import { db } from '../firebase/firebase';
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 import { 
@@ -44,12 +44,12 @@ export default function Layout({ children, onLogout }: LayoutProps) {
   }, [currentUser, loading, navigate]);
 
   useEffect(() => {
-    const user = auth.currentUser;
-    if (!user) return;
+    if (loading) return;
+    if (!currentUser) return;
 
     const q = query(
       collection(db, "vaults"),
-      where("userId", "==", user.uid)
+      where("userId", "==", currentUser.uid)
     );
 
     // ✅ écoute en temps réel
@@ -59,7 +59,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [loading, currentUser]);
 
 
   // Gérer la déconnexion

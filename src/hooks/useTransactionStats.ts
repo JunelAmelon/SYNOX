@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db, auth } from '../firebase/firebase';
+import { db } from '../firebase/firebase';
+import { useAuth } from './useAuth';
 
 export interface TransactionStats {
   // Totaux
@@ -51,6 +52,7 @@ export interface TransactionStats {
 }
 
 export const useTransactionStats = () => {
+  const { currentUser, loading: authLoading } = useAuth();
   const [stats, setStats] = useState<TransactionStats | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,7 +63,6 @@ export const useTransactionStats = () => {
       console.log('📊 [TransactionStats] Calcul des statistiques de transactions...');
       setLoading(true);
       
-      const currentUser = auth.currentUser;
       if (!currentUser) {
         throw new Error('Utilisateur non connecté');
       }
@@ -227,8 +228,12 @@ export const useTransactionStats = () => {
   };
 
   useEffect(() => {
+    // Attendre que l'authentification soit terminée
+    if (authLoading) return;
+    if (!currentUser) return;
+    
     calculateStats();
-  }, []);
+  }, [authLoading, currentUser]);
 
   const refreshStats = () => {
     calculateStats();

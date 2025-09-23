@@ -94,8 +94,9 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   }, [transactions, transactionSearchTerm]);
 
   useEffect(() => {
-    const currentUser = auth.currentUser; // 🔑 récupère le user connecté
-    if (!currentUser) return; // pas connecté → on sort
+    // Attendre que l'authentification soit terminée
+    if (loading) return;
+    if (!currentUser) return;
   
     const vaultsCollection = collection(db, "vaults");
   
@@ -121,7 +122,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
     });
   
     return () => unsubscribe(); // Cleanup à la désinstallation
-  }, []); // Pas de dépendance nécessaire, on prend directement auth.currentUser
+  }, [loading, currentUser]);
   
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {

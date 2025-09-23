@@ -2,9 +2,7 @@ import React, { useState } from 'react';
 import Layout from '../components/Layout';
 import TrustedPartyModal from '../components/TrustedPartyModal';
 import { useTrustedThirdParties, CreateTrustedPartyData, UpdateTrustedPartyData, TrustedThirdParty } from '../hooks/useTrustedThirdParties';
-import { db, auth } from "../firebase/firebase";
 import { useAuth } from '../hooks/useAuth';
-import { onAuthStateChanged } from "firebase/auth";
 import { 
   Users,
   Plus,
@@ -60,7 +58,7 @@ export default function TrustedThirdParties({ onLogout }: TrustedThirdPartiesPro
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, []);
-  const currentUser = auth.currentUser;
+  const { currentUser, loading: authLoading } = useAuth();
 
   const cardClasses = darkMode 
     ? 'bg-gray-800 border-gray-700 text-white' 

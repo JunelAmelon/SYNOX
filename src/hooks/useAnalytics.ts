@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db, auth } from '../firebase/firebase';
+import { db } from '../firebase/firebase';
+import { useAuth } from './useAuth';
 
 export interface AnalyticsData {
   // Statistiques générales
@@ -35,6 +36,7 @@ export interface AnalyticsData {
 }
 
 export const useAnalytics = () => {
+  const { currentUser, loading: authLoading } = useAuth();
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,6 @@ export const useAnalytics = () => {
       console.log('📊 [Analytics] Calcul des statistiques en cours...');
       setLoading(true);
       
-      const currentUser = auth.currentUser;
       if (!currentUser) {
         throw new Error('Utilisateur non connecté');
       }
@@ -188,8 +189,12 @@ export const useAnalytics = () => {
   };
 
   useEffect(() => {
+    // Attendre que l'authentification soit terminée
+    if (authLoading) return;
+    if (!currentUser) return;
+    
     calculateAnalytics();
-  }, []);
+  }, [authLoading, currentUser]);
 
   const refreshAnalytics = () => {
     calculateAnalytics();
