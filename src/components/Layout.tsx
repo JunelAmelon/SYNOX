@@ -100,7 +100,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
     { path: '/analytics', icon: Target, label: 'Analyses' },
     { path: '/transactions', icon: CreditCard, label: 'Transactions' },
     { path: '/trusted-parties', icon: Users, label: 'Tiers de confiance' },
-    { path: '/notifications', icon: Bell, label: 'Notifications' },
+    /* NOTIF  { path: '/notifications', icon: Bell, label: 'Notifications' },*/
     { path: '/settings', icon: Settings, label: 'Paramètres' },
   ];
 

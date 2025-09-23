@@ -227,12 +227,12 @@ if (selectedVault.isGoalBased === false) {
 try {
 // Ouvrir KkiaPay widget
 openKkiapayWidget({
-amount: amount,
-api_key: "b84e362080fd11f0bd120dc0f31efc63",
-sandbox: true,
-email: "client@example.com",
-phone: "97000000",
-data: JSON.stringify({ vaultId: selectedVault.id, montant: amount})
+    amount: amount,
+    // La clé et le mode sandbox sont lus depuis les variables d'environnement.
+    // Il n'est pas nécessaire de les spécifier ici.
+    email: auth.currentUser?.email || "client@example.com",
+    phone: "97000000", // TODO: Rendre ce champ dynamique si possible
+    data: JSON.stringify({ vaultId: selectedVault.id, montant: amount })
 });
 
 setOpenMenuId(null);
