@@ -46,6 +46,7 @@ interface Vault {
   unlockDate?: string;
   createdAt: string;
   updatedAt?: string;
+  isGoalBased?: boolean; // Indique si c'est un coffre avec objectif précis (true) ou épargne libre (false)
 }
 
 interface VaultsProps {
@@ -66,8 +67,6 @@ const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'locked' | 'completed'>('all');
 const [currentPage, setCurrentPage] = useState(1);
 const [searchTerm, setSearchTerm] = useState('');
-const [depositAmount, setDepositAmount] = useState(0);
-const [withdrawAmount, setWithdrawAmount] = useState(0);
 
 const {
 loading,
@@ -537,9 +536,7 @@ showError("Impossible de traiter le retrait. Réessayez plus tard.");
 console.log('🔑 [DEBUG] Clé KkiaPay depuis env:', import.meta.env.VITE_KKIAPAY_PUBLIC_KEY);
 console.log('🔑 [DEBUG] Type de clé:', typeof import.meta.env.VITE_KKIAPAY_PUBLIC_KEY);
 
-const { openKkiapayWidget, addKkiapayListener, removeKkiapayListener } = useKKiaPay({
-    apikey: import.meta.env.VITE_KKIAPAY_PUBLIC_KEY,
-  });
+const { openKkiapayWidget, addKkiapayListener, removeKkiapayListener } = useKKiaPay();
 
 console.log('🎯 [DEBUG] Hook useKKiaPay initialisé avec succès');
 console.log('🎯 [DEBUG] openKkiapayWidget:', typeof openKkiapayWidget);
@@ -604,8 +601,8 @@ addKkiapayListener("success", successHandler);
 addKkiapayListener("failed", failureHandler);
 
 return () => {
-  removeKkiapayListener("success", successHandler);
-  removeKkiapayListener("failed", failureHandler);
+  removeKkiapayListener("success");
+  removeKkiapayListener("failed");
 };
 }, [addKkiapayListener, removeKkiapayListener, showError, success]);
 
@@ -677,24 +674,12 @@ const errorMessage = err.message;
 // Fonctions pour ouvrir les modals
 const handleOpenDepositModal = (vault: Vault) => {
 setSelectedVault(vault);
-// Pour les coffres "Libre", pré-remplir avec le montant objectif
-if (vault.isGoalBased === false && vault.target) {
-  setDepositAmount(vault.target);
-} else {
-  setDepositAmount(0);
-}
 setShowDepositModal(true);
 setOpenMenuId(null);
 };
 
 const handleOpenWithdrawModal = (vault: Vault) => {
 setSelectedVault(vault);
-// Pour les coffres "Libre", pré-remplir avec le montant exact déposé
-if (vault.isGoalBased === false) {
-  setWithdrawAmount(vault.current);
-} else {
-  setWithdrawAmount(0);
-}
 setShowWithdrawModal(true);
 setOpenMenuId(null);
 };
@@ -795,7 +780,7 @@ Nouveau Coffre
     {!loading && (
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 mb-8">
       {paginatedVaults.map((vault) => {
-        const vaultTypeInfo = vaultTypes[vault.type];
+        const vaultTypeInfo = vaultTypes[vault.type as keyof typeof vaultTypes] || vaultTypes.other;
         const VaultIcon = vaultTypeInfo.icon;
         
         return (
@@ -1180,8 +1165,6 @@ Nouveau Coffre
     onDeposit={handleDepositFromModal}
     darkMode={darkMode}
     vaultName={selectedVault?.name || ''}
-    initialAmount={depositAmount}
-    isLibreVault={selectedVault?.isGoalBased === false}
   />
 
   <WithdrawModal
@@ -1194,8 +1177,6 @@ Nouveau Coffre
     darkMode={darkMode}
     vaultName={selectedVault?.name || ''}
     currentBalance={selectedVault?.current || 0}
-    initialAmount={withdrawAmount}
-    isLibreVault={selectedVault?.isGoalBased === false}
   />
 </Layout>
 );

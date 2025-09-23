@@ -1,15 +1,16 @@
-// Configuration Kkiapay pour API REST
+import { kkiapay } from '@kkiapay-org/nodejs-sdk';
+
+// Configuration Kkiapay selon la documentation officielle
 const kkiapayConfig = {
+  privatekey: import.meta.env.VITE_KKIAPAY_PRIVATE_KEY || '',
   publickey: import.meta.env.VITE_KKIAPAY_PUBLIC_KEY || '',
   secretkey: import.meta.env.VITE_KKIAPAY_SECRET_KEY || '',
-  baseUrl: 'https://api.kkiapay.me/v1'
+  sandbox: import.meta.env.VITE_KKIAPAY_SANDBOX === 'true'
 };
 
-console.log('🔧 [KkiapayService] Configuration:', {
-  publickey: kkiapayConfig.publickey ? kkiapayConfig.publickey.substring(0, 10) + '...' : 'MANQUANTE',
-  secretkey: kkiapayConfig.secretkey ? kkiapayConfig.secretkey.substring(0, 10) + '...' : 'MANQUANTE',
-  baseUrl: kkiapayConfig.baseUrl
-});
+
+// Initialiser Kkiapay selon la documentation
+const k = kkiapay(kkiapayConfig);
 
 export interface KkiapayRefundData {
   transactionId: string;
@@ -29,27 +30,16 @@ export interface KkiapayRefundResult {
 export class KkiapayService {
   
   /**
-   * Vérifier le statut d'une transaction Kkiapay via API REST
+   * Vérifier le statut d'une transaction Kkiapay selon la documentation officielle
    */
   static async verifyTransaction(transactionId: string): Promise<any> {
     try {
       console.log('🔍 [KkiapayService] Vérification transaction:', transactionId);
       
-      const response = await fetch(`${kkiapayConfig.baseUrl}/transactions/${transactionId}/status`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${kkiapayConfig.secretkey}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const response = await k.verify(transactionId);
       
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log('✅ [KkiapayService] Transaction vérifiée:', data);
-      return data;
+      console.log('✅ [KkiapayService] Transaction vérifiée:', response);
+      return response;
       
     } catch (error) {
       console.error('❌ [KkiapayService] Erreur vérification transaction:', error);
@@ -78,31 +68,15 @@ export class KkiapayService {
         };
       }
 
-      // 2. Effectuer le remboursement via API REST
-      const refundResponse = await fetch(`${kkiapayConfig.baseUrl}/transactions/${data.transactionId}/refund`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${kkiapayConfig.secretkey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          amount: data.amount,
-          reason: data.reason
-        })
-      });
+      // 2. Effectuer le remboursement selon la documentation officielle
+      const refundResponse = await k.refund(data.transactionId);
       
-      if (!refundResponse.ok) {
-        const errorData = await refundResponse.json().catch(() => ({}));
-        throw new Error(`HTTP ${refundResponse.status}: ${errorData.message || refundResponse.statusText}`);
-      }
-      
-      const refundData = await refundResponse.json();
-      console.log('✅ [KkiapayService] Remboursement effectué:', refundData);
+      console.log('✅ [KkiapayService] Remboursement effectué:', refundResponse);
       
       return {
         success: true,
-        refundId: refundData.refund_id || refundData.id || `refund_${Date.now()}`,
-        details: refundData
+        refundId: refundResponse.refund_id || refundResponse.id || `refund_${Date.now()}`,
+        details: refundResponse
       };
 
     } catch (error) {
