@@ -73,7 +73,7 @@ export default function AuthLayout({ children, title, subtitle, currentPage }: A
       {/* Right Panel - Image */}
       <div className="hidden lg:block w-full lg:w-1/2 relative min-h-screen">
         <img 
-          src="https://sdmntpritalynorth.oaiusercontent.com/files/00000000-6b6c-6246-91a3-c27919c1508a/raw?se=2025-09-16T21%3A49%3A30Z&sp=r&sv=2024-08-04&sr=b&scid=41f50354-1a97-53ef-90a2-83b867605880&skoid=82a3371f-2f6c-4f81-8a78-2701b362559b&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-09-16T00%3A11%3A55Z&ske=2025-09-17T00%3A11%3A55Z&sks=b&skv=2024-08-04&sig=AszxhIiv7aJDZSd/scsTt4XYiG3dG6oVCuEEJjZQpBs%3D" 
+          src="/login-hero.png" 
           alt="Happy woman celebrating financial success with laptop and documents" 
           className="w-full h-full object-cover"
         />

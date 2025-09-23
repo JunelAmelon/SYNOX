@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../contexts/ThemeContext';
 import { db, auth } from "../firebase/firebase";
-import { useKKiaPay } from 'kkiapay-react';
-import { collection, onSnapshot, query, where, getDocs, addDoc, orderBy, increment, doc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, where } from "firebase/firestore";
 
 import { 
   Vault, 
@@ -29,15 +29,10 @@ interface LayoutProps {
 export default function Layout({ children, onLogout }: LayoutProps) {
   const navigate = useNavigate();
   const { currentUser, loading, logout } = useAuth();
+  const { setTheme, appliedTheme } = useTheme();
   const [vaultCount, setVaultCount] = useState<number>(0);
 
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('darkMode') === 'true' || 
-             (!localStorage.getItem('darkMode') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    }
-    return false;
-  });
+  const darkMode = appliedTheme === 'dark';
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
@@ -66,15 +61,6 @@ export default function Layout({ children, onLogout }: LayoutProps) {
     return () => unsubscribe();
   }, []);
 
-  // Apply dark mode to document
-  React.useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    localStorage.setItem('darkMode', darkMode.toString());
-  }, [darkMode]);
 
   // Gérer la déconnexion
   const handleLogout = async () => {
@@ -146,7 +132,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
           {/* User Menu */}
           <div className="flex items-center space-x-3">
             <button  
-              onClick={() => setDarkMode(!darkMode)}
+              onClick={() => setTheme(darkMode ? 'light' : 'dark')}
               className={`p-2.5 rounded-xl transition-all duration-300 ${
                 darkMode 
                   ? 'text-amber-400 hover:bg-gray-700 bg-gray-700/50' 

@@ -1,27 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Layout from '../components/Layout';
+import { useTheme } from '../contexts/ThemeContext';
 import { useTransactionStats } from '../hooks/useTransactionStats';
 import { 
-  CreditCard,
   Search,
-  Filter,
   Download,
-  Calendar,
   ArrowUpRight,
   ArrowDownRight,
   DollarSign,
-  Car,
-  Plane,
-  Home,
   ShoppingBag,
-  Smartphone,
   Vault,
-  MoreHorizontal,
   TrendingUp,
   TrendingDown,
   RefreshCw,
-  BarChart3,
-  PieChart
+  BarChart3
 } from 'lucide-react';
  
  
@@ -30,25 +22,40 @@ interface TransactionsProps {
 }
 
 export default function Transactions({ onLogout }: TransactionsProps) {
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark');
-    }
-    return false;
-  });
+  const { appliedTheme } = useTheme();
+  const darkMode = appliedTheme === 'dark';
   const [filterType, setFilterType] = useState('all');
   const [dateRange, setDateRange] = useState('30days');
+  const [visibleCount, setVisibleCount] = useState(5);
   const { stats, transactions, loading, error, refreshStats } = useTransactionStats();
 
+  const handleExport = () => {
+    if (transactions.length === 0) {
+      alert("Aucune transaction à exporter.");
+      return;
+    }
 
-  // Listen for dark mode changes
-  React.useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setDarkMode(document.documentElement.classList.contains('dark'));
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+    const headers = ['Date', 'Description', 'Type', 'Montant', 'Statut'];
+    const rows = transactions.map(t => [
+      `"${new Date(t.createdAt).toLocaleString('fr-FR')}"`,
+      `"${t.description || t.reference || 'N/A'}"`,
+      `"${t.type}"`,
+      t.montant,
+      `"${t.status}"`
+    ].join(','));
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `synox_transactions_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+
 
   // Affichage du loading
   if (loading) {
@@ -146,7 +153,15 @@ const cardClasses = darkMode
               >
                 <RefreshCw className="w-5 h-5" />
               </button>
-              <button className="flex items-center px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poly font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105">
+              <button 
+                onClick={handleExport}
+                disabled={transactions.length === 0}
+                className={`flex items-center px-6 py-3 rounded-xl font-poly font-bold transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 ${
+                  transactions.length > 0
+                    ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-black hover:from-amber-500 hover:to-amber-600'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
+              >
                 <Download className="w-5 h-5 mr-2" />
                 Exporter
               </button>
@@ -275,7 +290,7 @@ const cardClasses = darkMode
               {transactions.length === 0 ? (
                 <p className="p-6 text-center text-gray-500">Aucune transaction trouvée</p>
               ) : (
-                transactions.map((transaction) => {
+                transactions.slice(0, visibleCount).map((transaction) => {
                   const TransactionIcon = transaction.type === "income"
                     ? DollarSign
                     : transaction.type === "vault"
@@ -311,15 +326,19 @@ const cardClasses = darkMode
               )}
             </div>
 
-          <div className="p-6 border-t border-gray-300 dark:border-gray-600">
-            <button className={`w-full py-3 text-center font-poly font-bold transition-all duration-200 rounded-xl ${
-              darkMode 
-                ? 'text-gray-300 hover:text-white hover:bg-gray-700' 
-                : 'text-gray-600 hover:text-gray-900 hover:bg-stone-50'
-            }`}>
-              Charger plus de transactions
-            </button>
-          </div>
+          {visibleCount < transactions.length && (
+            <div className="p-6 border-t border-gray-300 dark:border-gray-600">
+              <button 
+                onClick={() => setVisibleCount(prevCount => prevCount + 5)}
+                className={`w-full py-3 text-center font-poly font-bold transition-all duration-200 rounded-xl ${
+                  darkMode 
+                    ? 'text-gray-300 hover:text-white hover:bg-gray-700' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-stone-50'
+                }`}>
+                Charger plus de transactions
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </Layout>

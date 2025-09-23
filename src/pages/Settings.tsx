@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Layout from '../components/Layout';
 import { useSettings, ProfileData, PasswordChangeData } from '../hooks/useSettings';
+import { useTheme } from '../contexts/ThemeContext';
 import { useToastContext } from '../contexts/ToastContext';
 
 import { 
@@ -26,21 +27,12 @@ interface SettingsProps {
 }
 
 export default function Settings({ onLogout }: SettingsProps) {
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark');
-    }
-    return false;
-  });
+  const { theme: currentTheme, setTheme, appliedTheme } = useTheme();
+  const darkMode = appliedTheme === 'dark';
+
   const [activeTab, setActiveTab] = useState('profile');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-  const [currentTheme, setCurrentTheme] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') || 'system';
-    }
-    return 'system';
-  });
 
   // Hook pour les paramètres
   const { 
@@ -125,57 +117,11 @@ export default function Settings({ onLogout }: SettingsProps) {
   };
 
   // Fonction pour changer de thème
-  const handleThemeChange = (theme: string) => {
-    setCurrentTheme(theme);
-    localStorage.setItem('theme', theme);
-    
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-      setDarkMode(true);
-    } else if (theme === 'light') {
-      document.documentElement.classList.remove('dark');
-      setDarkMode(false);
-    } else if (theme === 'system') {
-      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (systemPrefersDark) {
-        document.documentElement.classList.add('dark');
-        setDarkMode(true);
-      } else {
-        document.documentElement.classList.remove('dark');
-        setDarkMode(false);
-      }
-    }
-    
+  const handleThemeChange = (theme: 'light' | 'dark' | 'system') => {
+    setTheme(theme);
     success(`Thème changé vers ${theme === 'light' ? 'clair' : theme === 'dark' ? 'sombre' : 'système'}`);
   };
 
-  // Listen for dark mode changes
-  React.useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setDarkMode(document.documentElement.classList.contains('dark'));
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
-
-  // Listen for system theme changes when system theme is selected
-  React.useEffect(() => {
-    if (currentTheme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const handleChange = (e: MediaQueryListEvent) => {
-        if (e.matches) {
-          document.documentElement.classList.add('dark');
-          setDarkMode(true);
-        } else {
-          document.documentElement.classList.remove('dark');
-          setDarkMode(false);
-        }
-      };
-      
-      mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    }
-  }, [currentTheme]);
 
   const cardClasses = darkMode 
     ? 'bg-gray-800 border-gray-700 text-white' 
@@ -466,7 +412,7 @@ export default function Settings({ onLogout }: SettingsProps) {
                   return (
                     <button
                       key={theme.id}
-                      onClick={() => handleThemeChange(theme.id)}
+                      onClick={() => handleThemeChange(theme.id as 'light' | 'dark' | 'system')}
                       className={`p-4 rounded-xl border-2 transition-all duration-200 hover:scale-105 ${
                         isSelected
                           ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20 shadow-lg' 

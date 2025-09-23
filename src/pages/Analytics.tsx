@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Layout from '../components/Layout';
+import { useTheme } from '../contexts/ThemeContext';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { 
   TrendingUp, 
@@ -8,10 +9,7 @@ import {
   Calendar,
   BarChart3,
   PieChart,
-  Activity,
   DollarSign,
-  Percent,
-  Clock,
   RefreshCw,
   Vault,
   CreditCard
@@ -22,23 +20,11 @@ interface AnalyticsProps {
 }
 
 export default function Analytics({ onLogout }: AnalyticsProps) {
-  const [darkMode, setDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return document.documentElement.classList.contains('dark');
-    }
-    return false;
-  });
+  const { appliedTheme } = useTheme();
+  const darkMode = appliedTheme === 'dark';
   const [timeRange, setTimeRange] = useState('6months');
   const { analytics, loading, error, refreshAnalytics } = useAnalytics();
 
-  // Listen for dark mode changes
-  React.useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setDarkMode(document.documentElement.classList.contains('dark'));
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
 
   const cardClasses = darkMode 
     ? 'bg-gray-800 border-gray-700 text-white' 
@@ -108,21 +94,14 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
     monthlyData: []
   };
 
-  const monthlyData = [
-    { month: 'Jan', saved: 800, target: 1000 },
-    { month: 'Fév', saved: 950, target: 1000 },
-    { month: 'Mar', saved: 1200, target: 1200 },
-    { month: 'Avr', saved: 1100, target: 1200 },
-    { month: 'Mai', saved: 1350, target: 1300 },
-    { month: 'Jun', saved: 1400, target: 1300 },
-  ];
-
-  const categoryBreakdown = [
-    { category: 'Voyage', amount: 8500, percentage: 28, color: 'from-blue-500 to-blue-600' },
-    { category: 'Immobilier', amount: 15000, percentage: 50, color: 'from-green-500 to-green-600' },
-    { category: 'Véhicule', amount: 1200, percentage: 4, color: 'from-purple-500 to-purple-600' },
-    { category: 'Urgence', amount: 5500, percentage: 18, color: 'from-emerald-500 to-emerald-600' },
-  ];
+  const monthlyData = data.monthlyData || [];
+  const totalVaults = Object.values(data.vaultsByType).reduce((sum, count) => sum + count, 0);
+  const categoryBreakdown = Object.entries(data.vaultsByType).map(([key, count]) => ({
+    category: key.charAt(0).toUpperCase() + key.slice(1),
+    amount: count, // C'est le nombre de coffres, pas un montant en euros
+    percentage: totalVaults > 0 ? (count / totalVaults) * 100 : 0,
+    color: 'from-blue-500 to-blue-600' // Logique de couleur à améliorer plus tard
+  }));
 
   return (
     <Layout onLogout={onLogout}>
@@ -266,35 +245,35 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
             </div>
             
             <div className="space-y-4">
-              {monthlyData.map((data, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <span className={`text-sm font-poly font-semibold w-8 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      {data.month}
-                    </span>
-                    <div className="flex-1 w-32">
-                      <div className={`w-full h-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
-                        <div 
-                          className="h-2 rounded-full bg-gradient-to-r from-amber-400 to-amber-500"
-                          style={{ width: `${(data.saved / data.target) * 100}%` }}
-                        ></div>
+              {monthlyData.length > 0 ? (
+                monthlyData.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <span className={`text-sm font-poly font-semibold w-8 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {item.month}
+                      </span>
+                      <div className="flex-1 w-32">
+                        <div className={`w-full h-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                          <div 
+                            className="h-2 rounded-full bg-gradient-to-r from-green-400 to-green-500"
+                            style={{ width: `${item.deposits > 0 ? (item.deposits / (item.deposits + item.withdrawals)) * 100 : 0}%` }}
+                          ></div>
+                        </div>
                       </div>
                     </div>
+                    <div className="text-right">
+                      <p className="font-poly font-bold text-sm text-green-500">
+                        +{item.deposits.toLocaleString()} CFA
+                      </p>
+                      <p className={`text-xs ${item.balance >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                        Solde: {item.balance.toLocaleString()} CFA
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-poly font-bold text-sm">
-                      {data.saved}€ / {data.target}€
-                    </p>
-                    <p className={`text-xs ${
-                      data.saved >= data.target 
-                        ? 'text-emerald-600 dark:text-emerald-400' 
-                        : 'text-amber-600 dark:text-amber-400'
-                    }`}>
-                      {Math.round((data.saved / data.target) * 100)}%
-                    </p>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className='text-center text-gray-500'>Données mensuelles non disponibles.</p>
+              )}
             </div>
           </div>
 
@@ -306,24 +285,28 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
             </div>
             
             <div className="space-y-4">
-              {categoryBreakdown.map((category, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-4 h-4 rounded-full bg-gradient-to-r ${category.color}`}></div>
-                    <span className={`font-poly font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      {category.category}
-                    </span>
+              {categoryBreakdown.length > 0 ? (
+                categoryBreakdown.map((category, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-4 h-4 rounded-full bg-gradient-to-r ${category.color}`}></div>
+                      <span className={`font-poly font-semibold ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {category.category}
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-poly font-bold text-sm">
+                        {category.amount} coffre(s)
+                      </p>
+                      <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {category.percentage.toFixed(1)}%
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-poly font-bold text-sm">
-                      {category.amount.toLocaleString()}€
-                    </p>
-                    <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {category.percentage}%
-                    </p>
-                  </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className='text-center text-gray-500'>Aucune répartition par catégorie disponible.</p>
+              )}
             </div>
           </div>
         </div>
