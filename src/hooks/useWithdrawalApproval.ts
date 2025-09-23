@@ -286,7 +286,7 @@ export const useWithdrawalApproval = () => {
       const transactions = transactionSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as any[];
       
       // Trier par date de création (plus récent en premier)
       transactions.sort((a: any, b: any) => {
@@ -303,6 +303,8 @@ export const useWithdrawalApproval = () => {
       });
 
       // 2. Effectuer le remboursement via Kkiapay
+      console.log('💳 [KkiapayRefund] Tentative de remboursement avec transaction ID:', latestTransaction.id_transaction);
+      
       const refundResult = await KkiapayService.refundTransaction({
         transactionId: latestTransaction.id_transaction,
         amount: requestData.amount,
@@ -310,6 +312,8 @@ export const useWithdrawalApproval = () => {
         userEmail: '', // TODO: Récupérer l'email utilisateur
         vaultId: requestData.vaultId
       });
+      
+      console.log('💳 [KkiapayRefund] Résultat du remboursement:', refundResult);
 
       if (refundResult.success) {
         console.log('✅ [KkiapayRefund] Remboursement Kkiapay réussi:', refundResult.refundId);

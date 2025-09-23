@@ -1,15 +1,15 @@
-import { kkiapay } from '@kkiapay-org/nodejs-sdk';
-
-// Configuration Kkiapay
+// Configuration Kkiapay pour API REST
 const kkiapayConfig = {
-  privatekey: import.meta.env.VITE_KKIAPAY_PRIVATE_KEY || '',
   publickey: import.meta.env.VITE_KKIAPAY_PUBLIC_KEY || '',
   secretkey: import.meta.env.VITE_KKIAPAY_SECRET_KEY || '',
-  sandbox: import.meta.env.VITE_KKIAPAY_SANDBOX === 'true'
+  baseUrl: 'https://api.kkiapay.me/v1'
 };
 
-// Initialiser Kkiapay
-const k = kkiapay(kkiapayConfig);
+console.log('🔧 [KkiapayService] Configuration:', {
+  publickey: kkiapayConfig.publickey ? kkiapayConfig.publickey.substring(0, 10) + '...' : 'MANQUANTE',
+  secretkey: kkiapayConfig.secretkey ? kkiapayConfig.secretkey.substring(0, 10) + '...' : 'MANQUANTE',
+  baseUrl: kkiapayConfig.baseUrl
+});
 
 export interface KkiapayRefundData {
   transactionId: string;
@@ -29,16 +29,27 @@ export interface KkiapayRefundResult {
 export class KkiapayService {
   
   /**
-   * Vérifier le statut d'une transaction Kkiapay
+   * Vérifier le statut d'une transaction Kkiapay via API REST
    */
   static async verifyTransaction(transactionId: string): Promise<any> {
     try {
       console.log('🔍 [KkiapayService] Vérification transaction:', transactionId);
       
-      const response = await k.verify(transactionId);
+      const response = await fetch(`${kkiapayConfig.baseUrl}/transactions/${transactionId}/status`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${kkiapayConfig.secretkey}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
-      console.log('✅ [KkiapayService] Transaction vérifiée:', response);
-      return response;
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ [KkiapayService] Transaction vérifiée:', data);
+      return data;
       
     } catch (error) {
       console.error('❌ [KkiapayService] Erreur vérification transaction:', error);
@@ -67,15 +78,31 @@ export class KkiapayService {
         };
       }
 
-      // 2. Effectuer le remboursement
-      const refundResponse = await k.refund(data.transactionId);
+      // 2. Effectuer le remboursement via API REST
+      const refundResponse = await fetch(`${kkiapayConfig.baseUrl}/transactions/${data.transactionId}/refund`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${kkiapayConfig.secretkey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          amount: data.amount,
+          reason: data.reason
+        })
+      });
       
-      console.log('✅ [KkiapayService] Remboursement effectué:', refundResponse);
+      if (!refundResponse.ok) {
+        const errorData = await refundResponse.json().catch(() => ({}));
+        throw new Error(`HTTP ${refundResponse.status}: ${errorData.message || refundResponse.statusText}`);
+      }
+      
+      const refundData = await refundResponse.json();
+      console.log('✅ [KkiapayService] Remboursement effectué:', refundData);
       
       return {
         success: true,
-        refundId: refundResponse.refund_id || refundResponse.id,
-        details: refundResponse
+        refundId: refundData.refund_id || refundData.id || `refund_${Date.now()}`,
+        details: refundData
       };
 
     } catch (error) {
@@ -123,17 +150,16 @@ export class KkiapayService {
   /**
    * Traiter un remboursement complet pour un coffre d'épargne libre
    */
-  static async processVaultRefund(vaultId: string, userId: string, amount: number, reason: string): Promise<KkiapayRefundResult> {
+  static async processVaultRefund(vaultId: string, amount: number, reason: string): Promise<KkiapayRefundResult> {
     try {
       console.log('🏦 [KkiapayService] Traitement remboursement coffre:', {
         vaultId,
-        userId,
         amount,
         reason
       });
 
       // 1. Trouver la transaction de dépôt à rembourser
-      const transactionId = await this.findLatestDepositTransaction(vaultId, userId);
+      const transactionId = await this.findLatestDepositTransaction(vaultId, 'user');
       
       if (!transactionId) {
         return {

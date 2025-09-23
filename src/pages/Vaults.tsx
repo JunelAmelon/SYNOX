@@ -225,15 +225,30 @@ if (selectedVault.isGoalBased === false) {
 }
 
 try {
-// Ouvrir KkiaPay widget
-openKkiapayWidget({
+// Débogage : Paramètres du widget
+const widgetParams = {
     amount: amount,
-    // La clé et le mode sandbox sont lus depuis les variables d'environnement.
-    // Il n'est pas nécessaire de les spécifier ici.
+    key: import.meta.env.VITE_KKIAPAY_PUBLIC_KEY,
     email: auth.currentUser?.email || "client@example.com",
-    phone: "97000000", // TODO: Rendre ce champ dynamique si possible
+    phone: "97000000",
     data: JSON.stringify({ vaultId: selectedVault.id, montant: amount })
-});
+};
+
+console.log('💳 [DEBUG] Ouverture du widget KkiaPay avec les paramètres:', widgetParams);
+console.log('💳 [DEBUG] Montant:', amount);
+console.log('💳 [DEBUG] Email utilisateur:', auth.currentUser?.email);
+console.log('💳 [DEBUG] Vérification de window.kkiapay:', typeof window.kkiapay);
+
+// Utiliser l'API globale KkiaPay directement
+if (window.kkiapay) {
+    window.kkiapay.open(widgetParams);
+    console.log('✅ [DEBUG] Widget ouvert via window.kkiapay.open()');
+} else {
+    console.error('❌ [DEBUG] window.kkiapay non disponible');
+    // Fallback vers le hook
+    openKkiapayWidget(widgetParams);
+    console.log('✅ [DEBUG] Fallback vers openKkiapayWidget');
+}
 
 setOpenMenuId(null);
 success('Redirection vers le paiement...');
@@ -518,7 +533,16 @@ showError("Impossible de traiter le retrait. Réessayez plus tard.");
 }
 };
 
-const { openKkiapayWidget, addKkiapayListener, removeKkiapayListener } = useKKiaPay();
+// Débogage : Vérifier la clé d'API
+console.log('🔑 [DEBUG] Clé KkiaPay depuis env:', import.meta.env.VITE_KKIAPAY_PUBLIC_KEY);
+console.log('🔑 [DEBUG] Type de clé:', typeof import.meta.env.VITE_KKIAPAY_PUBLIC_KEY);
+
+const { openKkiapayWidget, addKkiapayListener, removeKkiapayListener } = useKKiaPay({
+    apikey: import.meta.env.VITE_KKIAPAY_PUBLIC_KEY,
+  });
+
+console.log('🎯 [DEBUG] Hook useKKiaPay initialisé avec succès');
+console.log('🎯 [DEBUG] openKkiapayWidget:', typeof openKkiapayWidget);
 
 // écouter les paiements
 useEffect(() => {
