@@ -66,6 +66,8 @@ const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'locked' | 'completed'>('all');
 const [currentPage, setCurrentPage] = useState(1);
 const [searchTerm, setSearchTerm] = useState('');
+const [depositAmount, setDepositAmount] = useState(0);
+const [withdrawAmount, setWithdrawAmount] = useState(0);
 
 const {
 loading,
@@ -84,19 +86,21 @@ const vaultsPerPage = 3;
 // Fonction pour vérifier si l'approbation des tiers est nécessaire
 const checkIfApprovalNeeded = (vaultData: any, currentAmount: number): boolean => {
   // Approbation requise si :
-  // 1. Le coffre est verrouillé ET la date de déverrouillage n'est pas atteinte
+  // 1. La date de déblocage n'est pas atteinte (même si le coffre n'est pas verrouillé)
   // 2. OU l'objectif n'est pas encore atteint (pour les coffres avec objectif)
   
-  if (vaultData.isLocked && vaultData.unlockDate) {
+  // Vérifier la date de déblocage
+  if (vaultData.unlockDate) {
     const unlockDate = new Date(vaultData.unlockDate);
     const now = new Date();
     if (now < unlockDate) {
-      console.log('🔒 [ApprovalCheck] Coffre verrouillé jusqu\'au', unlockDate.toLocaleDateString());
+      console.log('📅 [ApprovalCheck] Date de déblocage non atteinte:', unlockDate.toLocaleDateString());
       return true;
     }
   }
   
-  if (vaultData.target && currentAmount < vaultData.target) {
+  // Vérifier l'objectif pour les coffres à objectif précis
+  if (vaultData.isGoalBased && vaultData.target && currentAmount < vaultData.target) {
     console.log('🎯 [ApprovalCheck] Objectif non atteint:', `${currentAmount}/${vaultData.target}`);
     return true;
   }
@@ -203,6 +207,23 @@ throw err; // Propager l'erreur
 const handleDepositFromModal = async (amount: number) => {
 if (!selectedVault) return;
 
+// Validation pour les coffres "Libre" : montant doit être exactement l'objectif
+if (selectedVault.isGoalBased === false) {
+  if (!selectedVault.target) {
+    showError("Erreur : Objectif non défini pour ce coffre libre");
+    return;
+  }
+  if (amount !== selectedVault.target) {
+    showError(`Pour un coffre libre, vous devez déposer exactement ${selectedVault.target.toLocaleString()} CFA (montant objectif)`);
+    return;
+  }
+  // Vérifier si le coffre est déjà rempli
+  if (selectedVault.current >= selectedVault.target) {
+    showError("Ce coffre libre est déjà rempli. Vous ne pouvez plus y déposer.");
+    return;
+  }
+}
+
 try {
 // Ouvrir KkiaPay widget
 openKkiapayWidget({
@@ -225,6 +246,14 @@ showError("Impossible d'effectuer le dépôt. Réessayez plus tard.");
 // Fonction pour gérer les retraits depuis le modal
 const handleWithdrawFromModal = async (amount: number, reason: string) => {
 if (!selectedVault || !auth.currentUser) return;
+
+// Validation pour les coffres "Libre" : montant doit être exactement le solde actuel
+if (selectedVault.isGoalBased === false) {
+  if (amount !== selectedVault.current) {
+    showError(`Pour un coffre libre, vous devez retirer exactement ${selectedVault.current.toLocaleString()} CFA (montant déposé)`);
+    return;
+  }
+}
 
 console.log('🚀 [RETRAIT] ========== DÉBUT DU PROCESSUS DE RETRAIT ==========');
 console.log('💰 [RETRAIT] Montant demandé:', amount, 'CFA');
@@ -345,41 +374,137 @@ if (needsApproval) {
   console.log('🔍 [RETRAIT] Détermination du type de traitement...');
   
   if (vaultData.isGoalBased === false) {
-    // ÉPARGNE LIBRE → Remboursement Kkiapay
-    console.log('💰 [RETRAIT] Type: ÉPARGNE LIBRE → Remboursement Kkiapay');
-    console.log('🔄 [RETRAIT] Recherche de transaction Kkiapay à rembourser...');
-    // TODO: Implémenter le remboursement Kkiapay direct
-    console.warn('⚠️ [RETRAIT] Remboursement Kkiapay pas encore implémenté pour retrait direct');
-    showError("Remboursement Kkiapay en cours d'implémentation pour les coffres d'épargne libre");
-  } else {
-    // OBJECTIF PRÉCIS → Retrait standard direct
-    console.log('🎯 [RETRAIT] Type: OBJECTIF PRÉCIS → Retrait standard direct');
-    console.log('💳 [RETRAIT] Débit du coffre en cours...');
+    // ÉPARGNE LIBRE → Remboursement Kkiapay APRÈS validation des tiers
+    console.log('💰 [RETRAIT] Type: ÉPARGNE LIBRE → Remboursement Kkiapay avec validation');
+    console.log('🔐 [RETRAIT] Validation des tiers de confiance requise pour remboursement Kkiapay');
     
-    // Débiter directement le coffre
-    await updateDoc(vaultRef, {
-      current: current - amount,
-      updatedAt: new Date()
-    });
+    // Recherche des tiers de confiance actifs avec permission d'approbation
+    const activeTrustedParties = trustedParties.filter(tp => 
+      tp.status === 'active' && 
+      tp.permissions.includes('approve_withdrawals')
+    );
 
-    console.log('✅ [RETRAIT] Coffre débité:', current, '→', (current - amount), 'CFA');
-    console.log('💾 [RETRAIT] Création de la transaction de retrait...');
+    console.log('👥 [RETRAIT] Tiers de confiance trouvés pour validation Kkiapay:', activeTrustedParties.length);
 
-    // Créer la transaction de retrait
-    await createTransaction({
+    if (activeTrustedParties.length < 2) {
+      console.error('❌ [RETRAIT] Pas assez de tiers de confiance pour validation Kkiapay');
+      showError(`Vous devez avoir au moins 2 tiers de confiance actifs pour effectuer un remboursement Kkiapay. Actuellement: ${activeTrustedParties.length} tiers valides.`);
+      return;
+    }
+
+    // Prendre les 2 premiers tiers de confiance
+    const selectedTrustedParties = activeTrustedParties.slice(0, 2).map(tp => ({
+      trustedPartyId: tp.id,
+      trustedPartyName: tp.name,
+      trustedPartyEmail: tp.email,
+      accessCode: ''
+    }));
+
+    console.log('✅ [RETRAIT] Tiers sélectionnés pour validation Kkiapay:', selectedTrustedParties.map(tp => tp.trustedPartyName));
+    console.log('📤 [RETRAIT] Création de la demande de remboursement Kkiapay...');
+
+    // Créer une demande de retrait avec approbation pour remboursement Kkiapay
+    const requestId = await createWithdrawalRequest(
+      auth.currentUser.uid,
+      selectedVault.id,
+      selectedVault.name,
+      amount,
+      `${reason} - Remboursement Kkiapay`,
+      selectedTrustedParties
+    );
+
+    console.log('✅ [RETRAIT] Demande de remboursement Kkiapay créée avec ID:', requestId);
+    console.log('💾 [RETRAIT] Création de la transaction en attente...');
+
+    // Créer une transaction de remboursement Kkiapay en attente
+    const transactionRef = await createTransaction({
       amount: -amount,
-      paymentMethod: "Retrait libre",
-      status: "completed",
+      paymentMethod: "En attente remboursement Kkiapay",
+      status: "pending",
       type: "Retrait",
       userId: auth.currentUser.uid,
       vaultId: selectedVault.id,
-      reference: "Retrait libre - objectif atteint",
-      reason: reason
+      reference: `Kkiapay-${requestId}`,
+      reason: `${reason} - Remboursement Kkiapay`
     });
 
-    console.log('✅ [RETRAIT] Transaction de retrait créée');
-    console.log('🎉 [RETRAIT] Retrait libre terminé avec succès');
-    success(`Retrait de ${amount} CFA effectué avec succès !`);
+    console.log('✅ [RETRAIT] Transaction Kkiapay créée avec ID:', transactionRef.id);
+
+    // Enregistrer l'ID de la transaction dans la demande de retrait
+    await updateDoc(doc(db, 'withdrawalRequests', requestId), {
+      transactionId: transactionRef.id,
+      isKkiapayRefund: true // Marquer comme remboursement Kkiapay
+    });
+
+    console.log('✅ [RETRAIT] Demande de remboursement Kkiapay terminée avec succès');
+    warning(`Demande de remboursement Kkiapay de ${amount.toLocaleString()} CFA créée. En attente de validation des tiers de confiance.`);
+
+  } else {
+    // OBJECTIF PRÉCIS → Virement manuel après validation
+    console.log('🎯 [RETRAIT] Type: OBJECTIF PRÉCIS → Virement manuel avec validation');
+    console.log('🔐 [RETRAIT] Validation des tiers de confiance requise pour virement manuel');
+    
+    // Recherche des tiers de confiance actifs avec permission d'approbation
+    const activeTrustedParties = trustedParties.filter(tp => 
+      tp.status === 'active' && 
+      tp.permissions.includes('approve_withdrawals')
+    );
+
+    console.log('👥 [RETRAIT] Tiers de confiance trouvés pour validation virement:', activeTrustedParties.length);
+
+    if (activeTrustedParties.length < 2) {
+      console.error('❌ [RETRAIT] Pas assez de tiers de confiance pour validation virement');
+      showError(`Vous devez avoir au moins 2 tiers de confiance actifs pour effectuer un virement manuel. Actuellement: ${activeTrustedParties.length} tiers valides.`);
+      return;
+    }
+
+    // Prendre les 2 premiers tiers de confiance
+    const selectedTrustedParties = activeTrustedParties.slice(0, 2).map(tp => ({
+      trustedPartyId: tp.id,
+      trustedPartyName: tp.name,
+      trustedPartyEmail: tp.email,
+      accessCode: ''
+    }));
+
+    console.log('✅ [RETRAIT] Tiers sélectionnés pour validation virement:', selectedTrustedParties.map(tp => tp.trustedPartyName));
+    console.log('📤 [RETRAIT] Création de la demande de virement manuel...');
+
+    // Créer une demande de retrait avec approbation pour virement manuel
+    const requestId = await createWithdrawalRequest(
+      auth.currentUser.uid,
+      selectedVault.id,
+      selectedVault.name,
+      amount,
+      `${reason} - Virement manuel`,
+      selectedTrustedParties
+    );
+
+    console.log('✅ [RETRAIT] Demande de virement manuel créée avec ID:', requestId);
+    console.log('💾 [RETRAIT] Création de la transaction en attente...');
+
+    // Créer une transaction de virement manuel en attente
+    const transactionRef = await createTransaction({
+      amount: -amount,
+      paymentMethod: "En attente virement manuel",
+      status: "pending",
+      type: "Retrait",
+      userId: auth.currentUser.uid,
+      vaultId: selectedVault.id,
+      reference: `Virement-${requestId}`,
+      reason: `${reason} - Virement manuel`
+    });
+
+    console.log('✅ [RETRAIT] Transaction virement créée avec ID:', transactionRef.id);
+
+    // Enregistrer l'ID de la transaction dans la demande de retrait
+    await updateDoc(doc(db, 'withdrawalRequests', requestId), {
+      transactionId: transactionRef.id,
+      isManualTransfer: true, // Marquer comme virement manuel
+      estimatedProcessingTime: '0-30 minutes' // Temps d'attente estimé
+    });
+
+    console.log('✅ [RETRAIT] Demande de virement manuel terminée avec succès');
+    warning(`Demande de virement manuel de ${amount.toLocaleString()} CFA créée. Après validation des tiers de confiance, le virement sera effectué manuellement sous 0-30 minutes.`);
   }
 }
 
@@ -528,12 +653,24 @@ const errorMessage = err.message;
 // Fonctions pour ouvrir les modals
 const handleOpenDepositModal = (vault: Vault) => {
 setSelectedVault(vault);
+// Pour les coffres "Libre", pré-remplir avec le montant objectif
+if (vault.isGoalBased === false && vault.target) {
+  setDepositAmount(vault.target);
+} else {
+  setDepositAmount(0);
+}
 setShowDepositModal(true);
 setOpenMenuId(null);
 };
 
 const handleOpenWithdrawModal = (vault: Vault) => {
 setSelectedVault(vault);
+// Pour les coffres "Libre", pré-remplir avec le montant exact déposé
+if (vault.isGoalBased === false) {
+  setWithdrawAmount(vault.current);
+} else {
+  setWithdrawAmount(0);
+}
 setShowWithdrawModal(true);
 setOpenMenuId(null);
 };
@@ -649,6 +786,17 @@ Nouveau Coffre
               {vault.isLocked ? (
                 // COFFRE FERMÉ
                 <div className="relative w-full h-full rounded-2xl overflow-hidden border-4 border-red-600 shadow-inner">
+                  {/* Badge de type de coffre - Position bas gauche */}
+                  <div className="absolute bottom-3 left-3 z-10">
+                    <div className={`px-2 py-1 rounded-lg text-xs font-semibold shadow-md ${
+                      vault.isGoalBased === false 
+                        ? 'bg-emerald-500/80 text-white border border-emerald-400' 
+                        : 'bg-blue-500/80 text-white border border-blue-400'
+                    }`}>
+                      {vault.isGoalBased === false ? 'Libre' : 'Objectif'}
+                    </div>
+                  </div>
+
                   {/* Texture métallique */}
                   <div className="absolute inset-0 opacity-20" style={{
                     backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)'
@@ -697,6 +845,17 @@ Nouveau Coffre
               ) : (
                 // COFFRE OUVERT
                 <div className="relative w-full h-full rounded-2xl overflow-hidden border-4 border-amber-500 shadow-inner">
+                  {/* Badge de type de coffre - Position bas gauche */}
+                  <div className="absolute bottom-3 left-3 z-10">
+                    <div className={`px-2 py-1 rounded-lg text-xs font-semibold shadow-md ${
+                      vault.isGoalBased === false 
+                        ? 'bg-emerald-500/80 text-white border border-emerald-400' 
+                        : 'bg-blue-500/80 text-white border border-blue-400'
+                    }`}>
+                      {vault.isGoalBased === false ? 'Libre' : 'Objectif'}
+                    </div>
+                  </div>
+
                   {/* Texture métallique */}
                   <div className="absolute inset-0 opacity-20" style={{
                     backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.1) 2px, rgba(255,255,255,0.1) 4px)'
@@ -784,9 +943,9 @@ Nouveau Coffre
                           <div className="flex items-center space-x-2">
                             <Calendar className="w-4 h-4 text-amber-700" />
                             <div>
-                              <div className="text-xs text-amber-700 font-bold">CRÉÉ LE</div>
+                              <div className="text-xs text-amber-700 font-bold">DÉBLOCAGE</div>
                               <div className="text-xs text-amber-800">
-                                {new Date(vault.createdAt).toLocaleDateString('fr-FR')}
+                                {vault.unlockDate ? new Date(vault.unlockDate).toLocaleDateString('fr-FR') : 'Non définie'}
                               </div>
                             </div>
                           </div>
@@ -796,7 +955,7 @@ Nouveau Coffre
                       {/* Plaque de série */}
                       <div className="absolute bottom-2 right-2">
                         <div className="bg-amber-600 text-amber-100 px-2 py-1 rounded text-xs font-mono font-bold shadow-lg">
-                          SYNOX-{vault.id.toString().padStart(4, '0')}
+                          SYNOX-{vault.id.toString().substring(0, 3)}
                         </div>
                       </div>
                     </div>
@@ -997,6 +1156,8 @@ Nouveau Coffre
     onDeposit={handleDepositFromModal}
     darkMode={darkMode}
     vaultName={selectedVault?.name || ''}
+    initialAmount={depositAmount}
+    isLibreVault={selectedVault?.isGoalBased === false}
   />
 
   <WithdrawModal
@@ -1009,6 +1170,8 @@ Nouveau Coffre
     darkMode={darkMode}
     vaultName={selectedVault?.name || ''}
     currentBalance={selectedVault?.current || 0}
+    initialAmount={withdrawAmount}
+    isLibreVault={selectedVault?.isGoalBased === false}
   />
 </Layout>
 );

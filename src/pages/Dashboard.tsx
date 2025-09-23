@@ -3,10 +3,12 @@ import Layout from '../components/Layout';
 import CreateVaultModal from '../components/CreateVaultModal';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, onSnapshot, query, where, orderBy } from "firebase/firestore";
 import { db, auth } from "../firebase/firebase";
 import { useAuth } from '../hooks/useAuth';
 import { onAuthStateChanged } from "firebase/auth";
+import { useVaults, CreateVaultData } from '../hooks/useVaults';
+import { useToastContext } from '../contexts/ToastContext';
 import { Link } from "react-router-dom";
 
 import { 
@@ -43,6 +45,8 @@ interface DashboardProps {
 
 export default function Dashboard({ onLogout }: DashboardProps) {
   const { currentUser, loading, logout } = useAuth();
+  const { createVault } = useVaults();
+  const { success, error: showError } = useToastContext();
   const [darkMode, setDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return document.documentElement.classList.contains('dark');
@@ -63,10 +67,17 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const handleCreateVault = (vaultData: any) => {
-    console.log('Nouveau coffre créé:', vaultData);
-    // Ici vous pourriez ajouter la logique pour sauvegarder le coffre
-    // Par exemple, l'ajouter à la liste des coffres existants
+  const handleCreateVault = async (vaultData: CreateVaultData) => {
+    try {
+      console.log('🚀 [Dashboard] Création du coffre:', vaultData);
+      await createVault(vaultData);
+      setShowCreateModal(false);
+      success('Coffre créé avec succès !');
+      console.log('✅ [Dashboard] Coffre créé et modal fermé');
+    } catch (err) {
+      console.error('❌ [Dashboard] Erreur lors de la création du coffre:', err);
+      showError('Erreur lors de la création du coffre. Veuillez réessayer.');
+    }
   };
 
   // Fonction pour filtrer les transactions
@@ -88,16 +99,23 @@ export default function Dashboard({ onLogout }: DashboardProps) {
   
     const vaultsCollection = collection(db, "vaults");
   
-    // onSnapshot avec filtrage par userId
-    const q = query(vaultsCollection, where("userId", "==", currentUser.uid));
+    // onSnapshot avec filtrage par userId et tri par date de création (les 3 plus récents)
+    const q = query(
+      vaultsCollection, 
+      where("userId", "==", currentUser.uid),
+      orderBy("createdAt", "desc")
+    );
   
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const vaultsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      const vaultsData = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .slice(0, 3); // Limiter aux 3 derniers coffres créés
+      
       setSavingsVaults(vaultsData); // ⚡ mise à jour de ton state
-      console.log("Coffres récupérés pour l'utilisateur :", vaultsData);
+      console.log("📦 [Dashboard] 3 derniers coffres récupérés:", vaultsData);
     }, (error) => {
       console.error("Erreur lors de la récupération des coffres:", error);
     });

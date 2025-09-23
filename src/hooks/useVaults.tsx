@@ -1,17 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
-import { 
-  collection, 
-  doc, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy,
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  query,
+  where,
   onSnapshot,
-  Timestamp 
+  Timestamp
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 
@@ -35,6 +33,7 @@ export interface Vault {
   lockConditions?: {
     minAmount?: number;
     lockDuration?: number; // en jours
+    unlockDate?: Date | null;
     requireThirdPartyApproval?: boolean;
   };
 }
@@ -81,37 +80,73 @@ export function useVaults() {
     }
 
     setLoading(true);
-    const vaultsRef = collection(db, 'vaults');
-    const q = query(
-      vaultsRef,
-      where('userId', '==', currentUser.uid),
-      orderBy('createdAt', 'desc')
-    );
+    console.log("🔍 [useVaults] Tentative de chargement des coffres pour l'utilisateur:", currentUser?.uid);
 
-    const unsubscribe = onSnapshot(q, 
-      (snapshot) => {
-        const vaultsData: Vault[] = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          vaultsData.push({
-            id: doc.id,
-            ...data,
-            createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
-            updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt,
-          } as Vault);
-        });
-        setVaults(vaultsData);
-        setLoading(false);
-        setError(null);
-      },
-      (err) => {
-        console.error('Erreur lors de la récupération des coffres:', err);
-        setError('Erreur lors du chargement des coffres');
-        setLoading(false);
-      }
-    );
+    // Vérification de l'existence de l'utilisateur
+    if (!currentUser?.uid) {
+      console.error('❌ [useVaults] Aucun ID utilisateur, chargement annulé.');
+      setError('Utilisateur non authentifié.');
+      setLoading(false);
+      return () => {}; // Retourne une fonction vide car pas d'abonnement
+    }
 
-    return () => unsubscribe();
+    try {
+      const vaultsRef = collection(db, 'vaults');
+      const q = query(
+        vaultsRef,
+        where('userId', '==', currentUser.uid)
+      );
+
+      console.log('✅ [useVaults] Requête Firestore créée. Mise en place de l\`écouteur...');
+
+      const unsubscribe = onSnapshot(q, 
+        (snapshot) => {
+          console.log(`📦 [useVaults] Données reçues: ${snapshot.docs.length} document(s).`);
+          const vaultsData: Vault[] = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            vaultsData.push({
+              id: doc.id,
+              ...data,
+              createdAt: data.createdAt?.toDate?.()?.toISOString() || data.createdAt,
+              updatedAt: data.updatedAt?.toDate?.()?.toISOString() || data.updatedAt,
+            } as Vault);
+          });
+          
+          // Le tri par Firestore est déjà fait, mais on garde le tri client par sécurité
+          const sortedVaults = vaultsData.sort((a, b) => {
+            const dateA = new Date(a.createdAt).getTime();
+            const dateB = new Date(b.createdAt).getTime();
+            return dateA - dateB; // Tri croissant (plus ancien en premier)
+          });
+          
+          console.log('📊 [useVaults] Coffres triés et prêts à être affichés.');
+          
+          setVaults(sortedVaults);
+          setError(null); // Réinitialiser l'erreur en cas de succès
+          setLoading(false);
+        },
+        (err) => {
+          // Gestion des erreurs de l'écouteur onSnapshot
+          console.error('❌ [useVaults] Erreur dans l\`écouteur onSnapshot:', err);
+          setError('Erreur lors de la mise à jour des coffres.');
+          setLoading(false);
+        }
+      );
+
+      // La fonction de nettoyage qui se désabonne de l'écouteur
+      return () => {
+        console.log('🧹 [useVaults] Nettoyage et désabonnement de l\`écouteur.');
+        unsubscribe();
+      };
+
+    } catch (err) {
+      // Gestion des erreurs synchrones (ex: création de la requête)
+      console.error('❌ [useVaults] Erreur synchrone avant la mise en place de l\`écouteur:', err);
+      setError('Erreur lors de l\'initialisation du chargement des coffres.');
+      setLoading(false);
+      return () => {}; // Retourne une fonction vide car pas d'abonnement
+    }
   }, [currentUser]);
 
   // Créer un nouveau coffre
@@ -137,7 +172,7 @@ export function useVaults() {
         updatedAt: now,
         isGoalBased: vaultData.isGoalBased,
         isLocked: false,
-        unlockDate: null,
+        unlockDate: vaultData.lockConditions?.unlockDate?.toISOString() || null,
         description: vaultData.description,
         lockConditions: vaultData.lockConditions,
       };

@@ -9,16 +9,12 @@ import {
   Shield,
   Bell,
   Palette,
-  Globe,
-  CreditCard,
   Download,
   Trash2,
   Eye,
   EyeOff,
   Save,
   Camera,
-  Mail,
-  Phone,
   Lock,
   Smartphone,
   Moon,
@@ -39,6 +35,12 @@ export default function Settings({ onLogout }: SettingsProps) {
   const [activeTab, setActiveTab] = useState('profile');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') || 'system';
+    }
+    return 'system';
+  });
 
   // Hook pour les paramètres
   const { 
@@ -53,7 +55,7 @@ export default function Settings({ onLogout }: SettingsProps) {
   } = useSettings();
 
   // Hook pour les toasts
-  const { success, error: showError, warning } = useToastContext();
+  const { success, error: showError } = useToastContext();
 
   // États pour les formulaires
   const [profileData, setProfileData] = useState<ProfileData>(() => {
@@ -122,6 +124,31 @@ export default function Settings({ onLogout }: SettingsProps) {
     }
   };
 
+  // Fonction pour changer de thème
+  const handleThemeChange = (theme: string) => {
+    setCurrentTheme(theme);
+    localStorage.setItem('theme', theme);
+    
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+      setDarkMode(true);
+    } else if (theme === 'light') {
+      document.documentElement.classList.remove('dark');
+      setDarkMode(false);
+    } else if (theme === 'system') {
+      const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (systemPrefersDark) {
+        document.documentElement.classList.add('dark');
+        setDarkMode(true);
+      } else {
+        document.documentElement.classList.remove('dark');
+        setDarkMode(false);
+      }
+    }
+    
+    success(`Thème changé vers ${theme === 'light' ? 'clair' : theme === 'dark' ? 'sombre' : 'système'}`);
+  };
+
   // Listen for dark mode changes
   React.useEffect(() => {
     const observer = new MutationObserver(() => {
@@ -130,6 +157,25 @@ export default function Settings({ onLogout }: SettingsProps) {
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, []);
+
+  // Listen for system theme changes when system theme is selected
+  React.useEffect(() => {
+    if (currentTheme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = (e: MediaQueryListEvent) => {
+        if (e.matches) {
+          document.documentElement.classList.add('dark');
+          setDarkMode(true);
+        } else {
+          document.documentElement.classList.remove('dark');
+          setDarkMode(false);
+        }
+      };
+      
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    }
+  }, [currentTheme]);
 
   const cardClasses = darkMode 
     ? 'bg-gray-800 border-gray-700 text-white' 
@@ -416,22 +462,42 @@ export default function Settings({ onLogout }: SettingsProps) {
                   { id: 'system', label: 'Système', icon: Smartphone },
                 ].map((theme) => {
                   const ThemeIcon = theme.icon;
+                  const isSelected = currentTheme === theme.id;
                   return (
                     <button
                       key={theme.id}
-                      className={`p-4 rounded-xl border-2 transition-all duration-200 ${
-                        theme.id === 'light' 
-                          ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20' 
+                      onClick={() => handleThemeChange(theme.id)}
+                      className={`p-4 rounded-xl border-2 transition-all duration-200 hover:scale-105 ${
+                        isSelected
+                          ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20 shadow-lg' 
                           : darkMode 
-                            ? 'border-gray-600 hover:border-gray-500' 
-                            : 'border-stone-200 hover:border-stone-300'
+                            ? 'border-gray-600 hover:border-gray-500 hover:bg-gray-700' 
+                            : 'border-stone-200 hover:border-stone-300 hover:bg-stone-50'
                       }`}
                     >
-                      <ThemeIcon className="w-8 h-8 mx-auto mb-2" />
-                      <p className="font-poly font-semibold">{theme.label}</p>
+                      <ThemeIcon className={`w-8 h-8 mx-auto mb-2 ${
+                        isSelected ? 'text-amber-600 dark:text-amber-400' : ''
+                      }`} />
+                      <p className={`font-poly font-semibold ${
+                        isSelected ? 'text-amber-700 dark:text-amber-300' : ''
+                      }`}>{theme.label}</p>
+                      {isSelected && (
+                        <div className="mt-2">
+                          <div className="w-2 h-2 bg-amber-500 rounded-full mx-auto"></div>
+                        </div>
+                      )}
                     </button>
                   );
                 })}
+              </div>
+              <div className="mt-4 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  <strong>Thème actuel :</strong> {
+                    currentTheme === 'light' ? 'Clair' : 
+                    currentTheme === 'dark' ? 'Sombre' : 
+                    'Système (suit les préférences de votre appareil)'
+                  }
+                </p>
               </div>
             </div>
 

@@ -236,9 +236,9 @@ export const useWithdrawalApproval = () => {
         console.log('💰 [ProcessWithdrawal] Épargne libre - Initiation du remboursement Kkiapay');
         await processKkiapayRefund(requestData, requestId);
       } else {
-        // OBJECTIF PRÉCIS → Autre logique (à implémenter plus tard)
-        console.log('🎯 [ProcessWithdrawal] Objectif précis - Logique standard');
-        await processStandardWithdrawal(requestData, requestId);
+        // OBJECTIF PRÉCIS → Virement manuel
+        console.log('🎯 [ProcessWithdrawal] Objectif précis - Virement manuel');
+        await processManualTransfer(requestData, requestId);
       }
 
       console.log('✅ [ProcessWithdrawal] Retrait traité avec succès');
@@ -403,6 +403,43 @@ export const useWithdrawalApproval = () => {
 
     } catch (error) {
       console.error('❌ [StandardWithdrawal] Erreur lors du traitement standard:', error);
+      throw error;
+    }
+  };
+
+  // Traitement par virement manuel (pour objectif précis)
+  const processManualTransfer = async (requestData: WithdrawalRequest, requestId: string): Promise<void> => {
+    try {
+      console.log('🏦 [ManualTransfer] Début du processus de virement manuel');
+      console.log('⏰ [ManualTransfer] Délai estimé: 0-30 minutes');
+      
+      // Mettre à jour la transaction existante pour indiquer qu'elle est en cours de traitement manuel
+      if (requestData.transactionId) {
+        await updateDoc(doc(db, 'transactions', requestData.transactionId), {
+          status: 'processing',
+          paymentMethod: 'Virement manuel en cours',
+          reference: `Virement manuel - ${requestData.reason}`,
+          updatedAt: Timestamp.fromDate(new Date()),
+          estimatedProcessingTime: '0-30 minutes'
+        });
+      }
+
+      // Mettre à jour la demande de retrait pour indiquer le traitement manuel
+      await updateDoc(doc(db, 'withdrawalRequests', requestId), {
+        status: 'manual_processing',
+        manualProcessingStartedAt: Timestamp.fromDate(new Date()),
+        estimatedCompletionTime: new Date(Date.now() + 30 * 60 * 1000), // +30 minutes
+        processingNote: 'Virement manuel en cours - Délai estimé: 0-30 minutes'
+      });
+
+      console.log('✅ [ManualTransfer] Virement manuel initié avec succès');
+      console.log('📧 [ManualTransfer] Notification client: Virement en cours de traitement');
+
+      // TODO: Ici, vous pouvez ajouter une notification push/email au client
+      // pour l'informer que le virement est en cours de traitement manuel
+
+    } catch (error) {
+      console.error('❌ [ManualTransfer] Erreur lors du traitement manuel:', error);
       throw error;
     }
   };

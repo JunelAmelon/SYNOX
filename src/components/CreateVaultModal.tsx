@@ -18,7 +18,7 @@ export default function CreateVaultModal({ isOpen, onClose, onSubmit, darkMode }
     target: '',
     monthlyContrib: '',
     description: '',
-    lockDuration: '12',
+    unlockDate: '',
     autoLock: false,
     isGoalBased: true,
     supervisors: [] as string[]
@@ -61,7 +61,7 @@ export default function CreateVaultModal({ isOpen, onClose, onSubmit, darkMode }
       description: formData.description,
       isGoalBased: formData.isGoalBased,
       lockConditions: {
-        lockDuration: parseInt(formData.lockDuration) * 30, // Convert months to days
+        unlockDate: formData.unlockDate ? new Date(formData.unlockDate) : null,
         requireThirdPartyApproval: true
       }
     };
@@ -76,7 +76,7 @@ export default function CreateVaultModal({ isOpen, onClose, onSubmit, darkMode }
       target: '',
       monthlyContrib: '',
       description: '',
-      lockDuration: '12',
+      unlockDate: '',
       autoLock: false,
       isGoalBased: true,
       supervisors: []
@@ -381,23 +381,29 @@ export default function CreateVaultModal({ isOpen, onClose, onSubmit, darkMode }
             />
           </div>
 
-          {/* Lock Duration */}
+          {/* Unlock Date */}
           <div>
             <label className="block text-sm font-poppins font-semibold mb-2">
-              Durée de verrouillage (mois)
+              Date de déblocage <span className="text-red-500">*</span>
             </label>
-            <select
-              value={formData.lockDuration}
-              onChange={(e) => setFormData({ ...formData, lockDuration: e.target.value })}
-              className={`w-full px-4 py-3 rounded-xl border transition-colors ${inputClasses}`}
-            >
-              <option value="6">6 mois</option>
-              <option value="12">12 mois</option>
-              <option value="18">18 mois</option>
-              <option value="24">24 mois</option>
-              <option value="36">36 mois</option>
-            </select>
+            <div className="relative">
+              <Calendar className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
+                darkMode ? 'text-gray-400' : 'text-gray-500'
+              }`} />
+              <input
+                type="date"
+                value={formData.unlockDate}
+                onChange={(e) => setFormData({ ...formData, unlockDate: e.target.value })}
+                className={`w-full pl-10 pr-4 py-3 rounded-xl border transition-colors ${inputClasses}`}
+                min={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]} // Minimum demain
+                required
+              />
+            </div>
+            <p className={`text-xs mt-2 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Les retraits avant cette date nécessiteront l'approbation des tiers de confiance
+            </p>
           </div>
+
 
           {/* Auto Lock */}
           <div className="flex items-center justify-between">
