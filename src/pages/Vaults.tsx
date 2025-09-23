@@ -7,7 +7,8 @@ import { useVaults, CreateVaultData } from '../hooks/useVaults';
 import { useToastContext } from '../contexts/ToastContext';
 import { useWithdrawalApproval } from '../hooks/useWithdrawalApproval';
 import { useTrustedThirdParties } from '../hooks/useTrustedThirdParties';
-import { db, auth } from "../firebase/firebase";
+import { db } from "../firebase/firebase";
+import { useAuth } from '../hooks/useAuth';
 import { useKKiaPay } from 'kkiapay-react';
 import { collection, onSnapshot, query, where, getDoc, addDoc, increment, doc, updateDoc } from "firebase/firestore";
 import {
@@ -54,6 +55,7 @@ onLogout: () => void;
 }
 
 export default function Vaults({ onLogout }: VaultsProps) {
+const { currentUser, loading: authLoading } = useAuth();
 const [darkMode, setDarkMode] = useState(() => {
 return document.documentElement.classList.contains('dark');
 });
@@ -228,14 +230,14 @@ try {
 const widgetParams = {
     amount: amount,
     key: import.meta.env.VITE_KKIAPAY_PUBLIC_KEY,
-    email: auth.currentUser?.email || "client@example.com",
+    email: currentUser?.email || "client@example.com",
     phone: "97000000",
     data: JSON.stringify({ vaultId: selectedVault.id, montant: amount })
 };
 
 console.log('💳 [DEBUG] Ouverture du widget KkiaPay avec les paramètres:', widgetParams);
 console.log('💳 [DEBUG] Montant:', amount);
-console.log('💳 [DEBUG] Email utilisateur:', auth.currentUser?.email);
+console.log('💳 [DEBUG] Email utilisateur:', currentUser?.email);
 console.log('💳 [DEBUG] Vérification de window.kkiapay:', typeof window.kkiapay);
 
 // Utiliser l'API globale KkiaPay directement
@@ -259,7 +261,7 @@ showError("Impossible d'effectuer le dépôt. Réessayez plus tard.");
 
 // Fonction pour gérer les retraits depuis le modal
 const handleWithdrawFromModal = async (amount: number, reason: string) => {
-if (!selectedVault || !auth.currentUser) return;
+if (!selectedVault || !currentUser) return;
 
 // Validation pour les coffres "Libre" : montant doit être exactement le solde actuel
 if (selectedVault.isGoalBased === false) {
@@ -273,7 +275,7 @@ console.log('🚀 [RETRAIT] ========== DÉBUT DU PROCESSUS DE RETRAIT ==========
 console.log('💰 [RETRAIT] Montant demandé:', amount, 'CFA');
 console.log('📝 [RETRAIT] Raison:', reason);
 console.log('🏦 [RETRAIT] Coffre sélectionné:', selectedVault.name, '(ID:', selectedVault.id, ')');
-console.log('👤 [RETRAIT] Utilisateur:', auth.currentUser.email);
+console.log('👤 [RETRAIT] Utilisateur:', currentUser.email);
 
 try {
 console.log('📋 [RETRAIT] Récupération des données du coffre...');
@@ -347,7 +349,7 @@ if (needsApproval) {
 
   // Créer une demande de retrait avec approbation
   const requestId = await createWithdrawalRequest(
-    auth.currentUser.uid,
+    currentUser.uid,
     selectedVault.id,
     selectedVault.name,
     amount,
@@ -364,7 +366,7 @@ if (needsApproval) {
     paymentMethod: "En attente d'approbation",
     status: "pending",
     type: "Retrait",
-    userId: auth.currentUser.uid,
+    userId: currentUser.uid,
     vaultId: selectedVault.id,
     reference: `Demande-${requestId}`,
     reason: reason
@@ -419,7 +421,7 @@ if (needsApproval) {
 
     // Créer une demande de retrait avec approbation pour remboursement Kkiapay
     const requestId = await createWithdrawalRequest(
-      auth.currentUser.uid,
+      currentUser.uid,
       selectedVault.id,
       selectedVault.name,
       amount,
@@ -436,7 +438,7 @@ if (needsApproval) {
       paymentMethod: "En attente remboursement Kkiapay",
       status: "pending",
       type: "Retrait",
-      userId: auth.currentUser.uid,
+      userId: currentUser.uid,
       vaultId: selectedVault.id,
       reference: `Kkiapay-${requestId}`,
       reason: `${reason} - Remboursement Kkiapay`
@@ -485,7 +487,7 @@ if (needsApproval) {
 
     // Créer une demande de retrait avec approbation pour virement manuel
     const requestId = await createWithdrawalRequest(
-      auth.currentUser.uid,
+      currentUser.uid,
       selectedVault.id,
       selectedVault.name,
       amount,
@@ -502,7 +504,7 @@ if (needsApproval) {
       paymentMethod: "En attente virement manuel",
       status: "pending",
       type: "Retrait",
-      userId: auth.currentUser.uid,
+      userId: currentUser.uid,
       vaultId: selectedVault.id,
       reference: `Virement-${requestId}`,
       reason: `${reason} - Virement manuel`
@@ -563,7 +565,7 @@ console.log("Paiement réussi :", response);
       paymentMethod: "Momo",
       status: "active",
       type: "Versement",
-      userId: auth.currentUser?.uid,
+      userId: currentUser?.uid,
       vaultId: data.vaultId,
       reference: "Initiateur"
     });
@@ -607,7 +609,8 @@ return () => {
 }, [addKkiapayListener, removeKkiapayListener, showError, success]);
 
 useEffect(() => {
-const currentUser = auth.currentUser;
+// Attendre que l'authentification soit terminée
+if (authLoading) return;
 if (!currentUser) return;
 
 const q = query(
@@ -628,7 +631,7 @@ const unsubscribe = onSnapshot(q, (snapshot) => {
 });
 
 return () => unsubscribe();
-}, []);
+}, [authLoading, currentUser]);
 
 const vaultTypes = {
 travel: { name: 'Voyage', icon: Plane },
@@ -700,6 +703,37 @@ if (currentPage < totalPages) {
 setCurrentPage(currentPage + 1);
 }
 };
+
+// Afficher un indicateur de chargement pendant l'authentification
+if (authLoading) {
+  return (
+    <Layout onLogout={onLogout}>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+            Chargement de vos données...
+          </p>
+        </div>
+      </div>
+    </Layout>
+  );
+}
+
+// Rediriger vers la connexion si pas d'utilisateur
+if (!currentUser) {
+  return (
+    <Layout onLogout={onLogout}>
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+            Vous devez être connecté pour accéder à cette page.
+          </p>
+        </div>
+      </div>
+    </Layout>
+  );
+}
 
 return (
 <Layout onLogout={onLogout}>
