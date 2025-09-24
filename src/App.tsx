@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './contexts/ToastContext';
+import { ProfileProvider } from './contexts/ProfileContext';
 import Login from './pages/Login.tsx';
 import Signup from './pages/Signup.tsx';
 import Dashboard from './pages/Dashboard.tsx';
@@ -23,8 +24,9 @@ function App() {
 
   return (
     <AuthProvider>
-      <ToastProvider>
-        <Router>
+      <ProfileProvider>
+        <ToastProvider>
+          <Router>
           <Routes>
             <Route path="/login" element={<Login onLogin={() => {}} />} />
             <Route path="/signup" element={<Signup onLogin={() => {}} />} />
@@ -40,8 +42,9 @@ function App() {
             <Route path="/accept-invitation" element={<AcceptInvitation/>} />
             <Route path="/approve-withdrawal" element={<ApproveWithdrawal/>} />
           </Routes>
-        </Router>
-      </ToastProvider>
+          </Router>
+        </ToastProvider>
+      </ProfileProvider>
     </AuthProvider>
   );
 }

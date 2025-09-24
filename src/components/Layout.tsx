@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../contexts/ThemeContext';
+import { useProfile } from '../contexts/ProfileContext';
 import { db } from '../firebase/firebase';
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 
@@ -31,6 +32,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
   const navigate = useNavigate();
   const { currentUser, loading, logout } = useAuth();
   const { setTheme, appliedTheme } = useTheme();
+  const { profileImage, userName } = useProfile();
   const [vaultCount, setVaultCount] = useState<number>(0);
 
   const darkMode = appliedTheme === 'dark';
@@ -161,19 +163,29 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                 <Settings className="w-5 h-5" />
               </div>
             </Link>
-            <div className="flex items-center space-x-3 pl-3 border-l border-gray-300 dark:border-gray-600">
-              <div className="w-10 h-10 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
-                <User className="w-5 h-5 text-white" />
+            <Link to="/settings" className="flex items-center space-x-3 pl-3 border-l border-gray-300 dark:border-gray-600 hover:opacity-80 transition-opacity">
+              <div className="w-10 h-10 rounded-full overflow-hidden shadow-lg">
+                {profileImage ? (
+                  <img 
+                    src={profileImage} 
+                    alt="Photo de profil" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center">
+                    <User className="w-5 h-5 text-white" />
+                  </div>
+                )}
               </div>
               <div className="hidden sm:block">
                 <p className="font-poppins font-bold text-sm">
-                  {currentUser?.displayName || 'Utilisateur'}
+                  {currentUser?.displayName || userName || 'Utilisateur'}
                 </p>
                 <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   {currentUser?.emailVerified ? 'Compte vérifié' : 'En attente de vérification'}
                 </p>
               </div>
-            </div>
+            </Link>
           </div>
         </div>
       </header>

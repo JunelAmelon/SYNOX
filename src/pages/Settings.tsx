@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Layout from '../components/Layout';
+import ProfileImageUpload from '../components/ProfileImageUpload';
 import { useSettings, ProfileData, PasswordChangeData } from '../hooks/useSettings';
 import { useTheme } from '../contexts/ThemeContext';
 import { useToastContext } from '../contexts/ToastContext';
@@ -140,27 +141,12 @@ export default function Settings({ onLogout }: SettingsProps) {
     switch (activeTab) {
       case 'profile':
         return (
-          <form onSubmit={handleProfileSubmit} className="space-y-6">
-            <div className="flex items-center space-x-6">
-              <div className="relative">
-                <div className="w-24 h-24 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center">
-                  <User className="w-12 h-12 text-white" />
-                </div>
-                <button type="button" className="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white hover:bg-blue-600 transition-colors">
-                  <Camera className="w-4 h-4" />
-                </button>
-              </div>
-              <div>
-                <h3 className="font-poly font-bold text-xl">
-                  {profileData.firstName && profileData.lastName 
-                    ? `${profileData.firstName} ${profileData.lastName}` 
-                    : 'Utilisateur'
-                  }
-                </h3>
-                <p className={`${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>Membre Premium</p>
-                <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>Membre depuis juin 2024</p>
-              </div>
-            </div>
+          <div className="space-y-6">
+            {/* Composant de photo de profil */}
+            <ProfileImageUpload darkMode={darkMode} />
+            
+            {/* Formulaire de profil */}
+            <form onSubmit={handleProfileSubmit} className="space-y-6">
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -232,6 +218,7 @@ export default function Settings({ onLogout }: SettingsProps) {
               {loading ? 'Sauvegarde...' : 'Sauvegarder les modifications'}
             </button>
           </form>
+          </div>
         );
 
       case 'security':
