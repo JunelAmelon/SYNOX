@@ -45,6 +45,9 @@ export const getUserProfile = async (userId: string): Promise<UserProfile | null
  */
 export const createUserProfile = async (userId: string, profileData: Partial<UserProfile>): Promise<void> => {
   try {
+    console.log('🔥 Création du profil pour userId:', userId);
+    console.log('🔥 Données du profil:', profileData);
+    
     const profileRef = doc(db, PROFILES_COLLECTION, userId);
     const now = new Date();
     
@@ -55,9 +58,12 @@ export const createUserProfile = async (userId: string, profileData: Partial<Use
       updatedAt: now,
     };
     
+    console.log('🔥 Profil complet à sauvegarder:', newProfile);
+    
     await setDoc(profileRef, newProfile);
+    console.log('✅ Profil créé avec succès dans Firestore');
   } catch (error) {
-    console.error('Erreur lors de la création du profil:', error);
+    console.error('❌ Erreur lors de la création du profil:', error);
     throw error;
   }
 };
@@ -86,9 +92,13 @@ export const updateUserProfile = async (userId: string, updates: Partial<UserPro
  */
 export const updateProfileImage = async (userId: string, imageBase64: string): Promise<void> => {
   try {
+    console.log('🔥 Mise à jour de la photo pour userId:', userId);
+    console.log('🔥 Taille de l\'image (caractères):', imageBase64.length);
+    
     await updateUserProfile(userId, { profileImage: imageBase64 });
+    console.log('✅ Photo de profil mise à jour avec succès');
   } catch (error) {
-    console.error('Erreur lors de la mise à jour de la photo de profil:', error);
+    console.error('❌ Erreur lors de la mise à jour de la photo de profil:', error);
     throw error;
   }
 };

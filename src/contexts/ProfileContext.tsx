@@ -37,19 +37,27 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
 
   // Charger le profil depuis Firebase
   const loadProfile = async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      console.log('🔥 Pas d\'utilisateur connecté, arrêt du chargement du profil');
+      return;
+    }
     
+    console.log('🔥 Chargement du profil pour userId:', currentUser.uid);
     setLoading(true);
     setError(null);
     
     try {
       const profile = await getUserProfile(currentUser.uid);
+      console.log('🔥 Profil récupéré:', profile);
       
       if (profile) {
+        console.log('✅ Profil existant trouvé');
+        console.log('🔥 Photo de profil:', profile.profileImage ? 'Présente' : 'Absente');
         setProfileImageState(profile.profileImage || null);
         setUserNameState(profile.userName || '');
         setUserEmailState(profile.userEmail || currentUser.email || '');
       } else {
+        console.log('⚠️ Aucun profil existant, création d\'un nouveau profil');
         // Créer un profil par défaut si il n'existe pas
         await createUserProfile(currentUser.uid, {
           userEmail: currentUser.email || '',
@@ -60,7 +68,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
       }
     } catch (err) {
       setError('Erreur lors du chargement du profil');
-      console.error('Erreur lors du chargement du profil:', err);
+      console.error('❌ Erreur lors du chargement du profil:', err);
     } finally {
       setLoading(false);
     }
