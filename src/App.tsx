@@ -9,6 +9,7 @@ import Vaults from './pages/Vaults.tsx';
 import Analytics from './pages/Analytics.tsx';
 import Transactions from './pages/Transactions.tsx';
 import TrustedThirdParties from './pages/TrustedThirdParties.tsx';
+import Formation from './pages/Formation.tsx';
 import Notifications from './pages/Notifications.tsx';
 import Settings from './pages/Settings.tsx';
 import AcceptInvitation from './pages/AcceptInvitation.tsx';
@@ -16,8 +17,8 @@ import ApproveWithdrawal from './pages/ApproveWithdrawal.tsx';
 
 function App() {
   const handleLogout = () => {
-    
-    console.log('nada');
+    localStorage.removeItem('token');
+    window.location.href = '/login';
   };
 
   return (
@@ -33,6 +34,7 @@ function App() {
             <Route path="/analytics" element={<Analytics onLogout={handleLogout} />} />
             <Route path="/transactions" element={<Transactions onLogout={handleLogout} />} />
             <Route path="/trusted-parties" element={<TrustedThirdParties onLogout={handleLogout} />} />
+            <Route path="/formation" element={<Formation onLogout={handleLogout} />} />
             <Route path="/notifications" element={<Notifications onLogout={handleLogout} />} />
             <Route path="/settings" element={<Settings onLogout={handleLogout} />} />
             <Route path="/accept-invitation" element={<AcceptInvitation/>} />
