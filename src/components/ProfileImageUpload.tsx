@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { useProfile } from '../contexts/ProfileContext';
+import { useAuth } from '../hooks/useAuth';
 import { Camera, Upload, X, User } from 'lucide-react';
 
 interface ProfileImageUploadProps {
@@ -7,11 +8,15 @@ interface ProfileImageUploadProps {
 }
 
 export default function ProfileImageUpload({ darkMode }: ProfileImageUploadProps) {
-  const { profileImage, setProfileImage, userName } = useProfile();
+  const { profileImage, setProfileImage, userName, loading, error } = useProfile();
+  const { currentUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Nom à afficher avec la même logique que le header
+  const displayName = currentUser?.displayName || userName || 'Utilisateur';
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -29,25 +34,43 @@ export default function ProfileImageUpload({ darkMode }: ProfileImageUploadProps
 
     setIsUploading(true);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setProfileImage(result);
-      setIsUploading(false);
-    };
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const result = e.target?.result as string;
+        try {
+          await setProfileImage(result);
+          alert('Photo de profil mise à jour avec succès !');
+        } catch (error) {
+          alert('Erreur lors de la sauvegarde de la photo.');
+          console.error('Erreur:', error);
+        } finally {
+          setIsUploading(false);
+        }
+      };
 
-    reader.onerror = () => {
-      alert('Erreur lors du chargement de l\'image.');
-      setIsUploading(false);
-    };
+      reader.onerror = () => {
+        alert('Erreur lors du chargement de l\'image.');
+        setIsUploading(false);
+      };
 
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    } catch (error) {
+      alert('Erreur lors du traitement de l\'image.');
+      setIsUploading(false);
+    }
   };
 
-  const handleRemoveImage = () => {
-    setProfileImage(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const handleRemoveImage = async () => {
+    try {
+      await setProfileImage(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      alert('Photo de profil supprimée avec succès !');
+    } catch (error) {
+      alert('Erreur lors de la suppression de la photo.');
+      console.error('Erreur:', error);
     }
   };
 
@@ -94,20 +117,20 @@ export default function ProfileImageUpload({ darkMode }: ProfileImageUploadProps
 
         {/* Informations et actions */}
         <div className="flex-1 text-center sm:text-left">
-          <h4 className="font-poly font-bold text-lg mb-2">{userName}</h4>
+          <h4 className="font-poly font-bold text-lg mb-2">{displayName}</h4>
           <p className={`text-sm mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
             Personnalisez votre photo de profil pour une expérience plus personnelle
           </p>
           
           <div className="flex flex-col sm:flex-row gap-3">
             <button
-              onClick={triggerFileInput}
-              disabled={isUploading}
-              className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poly font-semibold hover:from-amber-500 hover:to-amber-600 transition-all duration-200 disabled:opacity-50"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              {isUploading ? 'Chargement...' : 'Changer la photo'}
-            </button>
+            onClick={triggerFileInput}
+            disabled={isUploading || loading}
+            className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poly font-semibold hover:from-amber-500 hover:to-amber-600 transition-all duration-200 disabled:opacity-50"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            {isUploading || loading ? 'Chargement...' : 'Changer la photo'}
+          </button>
             
             {profileImage && (
               <button
@@ -134,6 +157,15 @@ export default function ProfileImageUpload({ darkMode }: ProfileImageUploadProps
         onChange={handleImageUpload}
         className="hidden"
       />
+
+      {/* Affichage d'erreur */}
+      {error && (
+        <div className="mt-4 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+          <p className="text-sm text-red-700 dark:text-red-300">
+            <strong>Erreur :</strong> {error}
+          </p>
+        </div>
+      )}
 
       {/* Informations sur les formats acceptés */}
       <div className={`mt-6 p-4 rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
