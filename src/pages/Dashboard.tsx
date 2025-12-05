@@ -546,7 +546,7 @@ export default function Dashboard({ onLogout }: DashboardProps) {
           <div>
             <div className={`rounded-2xl p-3 sm:p-4 lg:p-6 border transition-colors duration-300 ${cardClasses}`}>
               <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 mb-4 sm:mb-6">
-                <h2 className="text-lg sm:text-xl font-poppins font-bold">Transactions Récentes</h2>
+                <h2 className="text-lg sm:text-xl font-poppins font-bold">Transactions récentes</h2>
                 <button 
                   onClick={() => setShowTransactionSearch(!showTransactionSearch)}
                   className={`p-2 rounded-lg transition-all duration-200 ${
