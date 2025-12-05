@@ -427,14 +427,14 @@ export default function Dashboard({ onLogout }: DashboardProps) {
               {/* Header responsive */}
               <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 mb-4 sm:mb-6">
                 <h2 className="text-lg sm:text-xl lg:text-2xl font-poppins font-bold leading-tight">
-                  Mes Coffres d'Épargne
+                  Mes coffres d'épargne
                 </h2>
                 <button 
                   onClick={() => setShowCreateModal(true)}
                   className="flex items-center justify-center px-4 py-2 sm:px-6 sm:py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poppins font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 text-sm sm:text-base"
                 >
                   <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                  <span className="whitespace-nowrap">Nouveau Coffre</span>
+                  <span className="whitespace-nowrap">Nouveau coffre</span>
                 </button>
               </div>
 

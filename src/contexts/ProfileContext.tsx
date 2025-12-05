@@ -32,13 +32,14 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
   const [profileImage, setProfileImageState] = useState<string | null>(null);
   const [userName, setUserNameState] = useState<string>('');
   const [userEmail, setUserEmailState] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true); // Commence à true
   const [error, setError] = useState<string | null>(null);
 
   // Charger le profil depuis Firebase
   const loadProfile = async () => {
     if (!currentUser) {
       console.log('🔥 Pas d\'utilisateur connecté, arrêt du chargement du profil');
+      setLoading(false);
       return;
     }
     
@@ -54,17 +55,18 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
         console.log('✅ Profil existant trouvé');
         console.log('🔥 Photo de profil:', profile.profileImage ? 'Présente' : 'Absente');
         setProfileImageState(profile.profileImage || null);
-        setUserNameState(profile.userName || '');
+        setUserNameState(profile.userName || currentUser.displayName || '');
         setUserEmailState(profile.userEmail || currentUser.email || '');
       } else {
         console.log('⚠️ Aucun profil existant, création d\'un nouveau profil');
-        // Créer un profil par défaut si il n'existe pas
+        const defaultUserName = currentUser.displayName || 'Nouvel Utilisateur';
         await createUserProfile(currentUser.uid, {
           userEmail: currentUser.email || '',
-          userName: currentUser.displayName || '',
+          userName: defaultUserName,
         });
         setUserEmailState(currentUser.email || '');
-        setUserNameState(currentUser.displayName || '');
+        setUserNameState(defaultUserName);
+        setProfileImageState(null); // Pas d'image par défaut
       }
     } catch (err) {
       setError('Erreur lors du chargement du profil');
@@ -83,6 +85,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
       setProfileImageState(null);
       setUserNameState('');
       setUserEmailState('');
+      setLoading(false);
     }
   }, [currentUser]);
 

@@ -179,7 +179,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
               </div>
               <div className="hidden sm:block">
                 <p className="font-poppins font-bold text-sm">
-                  {currentUser?.displayName || userName || 'Utilisateur'}
+                  {userName || currentUser?.displayName || 'Utilisateur'}
                 </p>
                 <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
                   {currentUser?.emailVerified ? 'Compte vérifié' : 'En attente de vérification'}

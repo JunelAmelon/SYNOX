@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import Layout from '../components/Layout';
 import ProfileImageUpload from '../components/ProfileImageUpload';
-import FirestoreTest from '../components/FirestoreTest';
 import { useSettings, ProfileData, PasswordChangeData } from '../hooks/useSettings';
 import { useTheme } from '../contexts/ThemeContext';
 import { useToastContext } from '../contexts/ToastContext';
@@ -136,7 +135,6 @@ export default function Settings({ onLogout }: SettingsProps) {
     { id: 'appearance', label: 'Apparence', icon: Palette },
     { id: 'privacy', label: 'Confidentialité', icon: Lock },
     { id: 'account', label: 'Compte', icon: SettingsIcon },
-    { id: 'debug', label: 'Debug Firestore', icon: SettingsIcon },
   ];
 
   const renderTabContent = () => {
@@ -515,13 +513,6 @@ export default function Settings({ onLogout }: SettingsProps) {
                 </div>
               </div>
             </div>
-          </div>
-        );
-
-      case 'debug':
-        return (
-          <div className="space-y-6">
-            <FirestoreTest darkMode={darkMode} />
           </div>
         );
 

@@ -3,6 +3,7 @@ import Layout from '../components/Layout';
 import CreateVaultModal from '../components/CreateVaultModal';
 import DepositModal from '../components/DepositModal';
 import WithdrawModal from '../components/WithdrawModal';
+import EditVaultModal from '../components/EditVaultModal';
 import { useVaults, CreateVaultData } from '../hooks/useVaults';
 import { useToastContext } from '../contexts/ToastContext';
 import { useWithdrawalApproval } from '../hooks/useWithdrawalApproval';
@@ -69,6 +70,7 @@ const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'locked' | 'completed'>('all');
 const [currentPage, setCurrentPage] = useState(1);
 const [searchTerm, setSearchTerm] = useState('');
+const [showEditModal, setShowEditModal] = useState(false);
 
 const {
 loading,
@@ -146,9 +148,27 @@ console.error('Erreur lors du verrouillage:', err);
 }
 };
 
-const handleEditVault = (vaultId: string) => {
-console.log('Modifier le coffre:', vaultId);
-setOpenMenuId(null);
+const handleEditVault = (vault: Vault) => {
+  setSelectedVault({
+    id: vault.id,
+    userId: vault.userId,
+    name: vault.name,
+    current: vault.current,
+    target: vault.target,
+    type: vault.type,
+    status: vault.status,
+    monthlyContrib: vault.monthlyContrib,
+    daysLeft: vault.daysLeft,
+    createdAt: vault.createdAt,
+    updatedAt: vault.updatedAt,
+    isGoalBased: vault.isGoalBased,
+    isLocked: vault.isLocked,
+    unlockDate: vault.unlockDate,
+    description: vault.description,
+    trustedThirdPartyId: vault.trustedThirdPartyId,
+    lockConditions: vault.lockConditions,
+  });
+  setShowEditModal(true);
 };
 
 const handleDeleteVault = async (vaultId: string) => {
@@ -687,6 +707,10 @@ setShowWithdrawModal(true);
 setOpenMenuId(null);
 };
 
+const openEditModal = (vault: Vault) => {
+  handleEditVault(vault);
+};
+
 // Pagination
 const totalPages = Math.ceil(filteredVaults.length / vaultsPerPage);
 const startIndex = (currentPage - 1) * vaultsPerPage;
@@ -1047,21 +1071,22 @@ Nouveau Coffre
                             Retirer des fonds
                           </button>
 
-                          {/* Séparateur */}
-                          <div className={`my-2 h-px ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}></div>
-
-                          {/* Autres boutons existants */}
+                          {/* Bouton Modifier */}
                           <button
-                            onClick={() => handleEditVault(vault.id)}
+                            onClick={() => openEditModal(vault)}
                             className={`w-full flex items-center px-4 py-3 text-left rounded-lg transition-all duration-200 ${
                               darkMode ? 'text-gray-300 hover:bg-gray-700 hover:text-white' 
-                                       : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                                       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                             }`}
                           >
                             <Edit className="w-4 h-4 mr-3" />
                             Modifier le coffre
                           </button>
 
+                          {/* Séparateur */}
+                          <div className={`my-2 h-px ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}></div>
+
+                          {/* Bouton Verrouiller */}
                           <button
                             onClick={() => handleLockVault(vault.id)}
                             className={`w-full flex items-center px-4 py-3 text-left rounded-lg transition-all duration-200 ${
@@ -1075,6 +1100,7 @@ Nouveau Coffre
 
                           <div className={`my-2 h-px ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}></div>
 
+                          {/* Bouton Supprimer */}
                           <button
                             onClick={() => handleDeleteVault(vault.id)}
                             className={`w-full flex items-center px-4 py-3 text-left rounded-lg transition-all duration-200 ${
@@ -1212,6 +1238,33 @@ Nouveau Coffre
     vaultName={selectedVault?.name || ''}
     currentBalance={selectedVault?.current || 0}
   />
+
+  {selectedVault && (
+    <EditVaultModal
+      isOpen={showEditModal}
+      onClose={() => setShowEditModal(false)}
+      vault={{
+        id: selectedVault.id,
+        userId: selectedVault.userId,
+        name: selectedVault.name,
+        current: selectedVault.current,
+        target: selectedVault.target,
+        type: selectedVault.type,
+        status: selectedVault.status,
+        monthlyContrib: selectedVault.monthlyContrib,
+        daysLeft: selectedVault.daysLeft,
+        createdAt: selectedVault.createdAt,
+        updatedAt: selectedVault.updatedAt,
+        isGoalBased: selectedVault.isGoalBased,
+        isLocked: selectedVault.isLocked,
+        unlockDate: selectedVault.unlockDate,
+        description: selectedVault.description,
+        trustedThirdPartyId: selectedVault.trustedThirdPartyId,
+        lockConditions: selectedVault.lockConditions,
+      }}
+      darkMode={darkMode}
+    />
+  )}
 </Layout>
 );
 }

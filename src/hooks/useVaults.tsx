@@ -50,6 +50,7 @@ export interface CreateVaultData {
 
 export interface UpdateVaultData {
   name?: string;
+  type?: Vault['type'];
   target?: number | null;
   monthlyContrib?: number | null;
   description?: string;
