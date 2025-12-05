@@ -52,7 +52,7 @@ export default function AuthLayout({ children, title, subtitle, currentPage }: A
         <div className="flex items-center justify-start w-full">
           <img 
             src={darkMode ? "/logo-blanc.png" : "/logo-noir.png"}
-            alt="SYNOX Logo" 
+            alt="ARYWO Logo" 
             className="h-[300px] sm:h-[360px] md:h-[420px] lg:h-[480px] w-auto object-contain"
           />
         </div>
@@ -89,7 +89,7 @@ export default function AuthLayout({ children, title, subtitle, currentPage }: A
             <p className={`text-sm leading-relaxed transition-colors duration-300 ${
               darkMode ? 'text-gray-300' : 'text-gray-600'
             }`}>
-              "Grâce à SYNOX, j'ai enfin atteint mes objectifs d'épargne ! L'application rend la gestion financière simple et motivante."
+              "Grâce à ARYWO, j'ai enfin atteint mes objectifs d'épargne ! L'application rend la gestion financière simple et motivante."
             </p>
           </div>
           <div className="flex items-center">

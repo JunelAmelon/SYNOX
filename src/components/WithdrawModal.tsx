@@ -98,7 +98,7 @@ export default function WithdrawModal({
           }`}>
             <div className="flex items-center space-x-2">
               <div className="text-xs sm:text-sm font-semibold">Solde disponible:</div>
-              <div className="text-base sm:text-lg font-bold">{currentBalance.toLocaleString()} €</div>
+              <div className="text-base sm:text-lg font-bold">{currentBalance.toLocaleString()} CFA</div>
             </div>
           </div>
 
@@ -113,7 +113,7 @@ export default function WithdrawModal({
                 <div className={`absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 text-base sm:text-lg font-bold ${
                 darkMode ? 'text-gray-400' : 'text-gray-500'
               }`}>
-                €
+                CFA
               </div>
               <input
                 type="number"

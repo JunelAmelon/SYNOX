@@ -224,7 +224,7 @@ export default function CreateVaultModal({ isOpen, onClose, onSubmit, darkMode }
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-poppins font-semibold mb-2">
-                  Objectif (€)
+                  Objectif (CFA)
                 </label>
                 <div className="relative">
                   <DollarSign className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
@@ -242,7 +242,7 @@ export default function CreateVaultModal({ isOpen, onClose, onSubmit, darkMode }
               </div>
               <div>
                 <label className="block text-sm font-poppins font-semibold mb-2">
-                  Contribution mensuelle (€) - <span className="text-xs font-normal">Optionnel</span>
+                  Contribution mensuelle (CFA) - <span className="text-xs font-normal">Optionnel</span>
                 </label>
                 <div className="relative">
                   <Calendar className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${
@@ -264,7 +264,7 @@ export default function CreateVaultModal({ isOpen, onClose, onSubmit, darkMode }
           {!formData.isGoalBased && (
             <div>
               <label className="block text-sm font-poppins font-semibold mb-2">
-                Montant initial (€) - <span className="text-xs font-normal">Optionnel</span>
+                Montant initial (CFA) - <span className="text-xs font-normal">Optionnel</span>
               </label>
               <div className="relative">
                 <DollarSign className={`absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 ${

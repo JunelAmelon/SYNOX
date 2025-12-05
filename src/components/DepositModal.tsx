@@ -78,7 +78,7 @@ export default function DepositModal({
                 <div className={`absolute left-2 sm:left-3 top-1/2 transform -translate-y-1/2 text-base sm:text-lg font-bold ${
                 darkMode ? 'text-gray-400' : 'text-gray-500'
               }`}>
-                €
+                CFA
               </div>
               <input
                 type="number"

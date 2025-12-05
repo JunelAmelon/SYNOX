@@ -128,7 +128,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
 
             <img 
               src={darkMode ? "/logo-blanc.png" : "/logo-noir.png"} 
-              alt="SYNOX Logo" 
+              alt="ARYWO Logo" 
               className="h-[140px] sm:h-[170px] md:h-[180px] lg:h-[200px] w-auto object-contain"
             />
           </div>
@@ -267,7 +267,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                 <div className="flex items-center mb-4 md:mb-0">
                   <img 
                     src={darkMode ? "/logo-blanc.png" : "/logo-noir.png"} 
-                    alt="SYNOX Logo" 
+                    alt="ARYWO Logo" 
                     className="w-[200px] h-auto"
                   />
                 </div>
@@ -292,7 +292,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                   </div>
                   
                   <div className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                    © 2025 SYNOX. Tous droits réservés.
+                    © 2025 ARYWO. Tous droits réservés.
                   </div>
                 </div>
               </div>
