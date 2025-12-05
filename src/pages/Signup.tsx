@@ -9,7 +9,7 @@ interface SignupProps {
 export default function Signup({ onLogin }: SignupProps) {
   return (
     <AuthLayout
-      title="Rejoignez SYNOX"
+      title="Rejoignez ARYWO"
       subtitle="Créez votre compte et commencez dès aujourd'hui à transformer vos habitudes financières."
       currentPage="signup"
     >

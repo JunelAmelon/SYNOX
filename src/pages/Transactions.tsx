@@ -49,7 +49,7 @@ export default function Transactions({ onLogout }: TransactionsProps) {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `synox_transactions_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `ARYWO_transactions_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

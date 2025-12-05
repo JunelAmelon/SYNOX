@@ -1022,7 +1022,7 @@ Nouveau Coffre
                       {/* Plaque de série */}
                       <div className="absolute bottom-2 right-2">
                         <div className="bg-amber-600 text-amber-100 px-2 py-1 rounded text-xs font-mono font-bold shadow-lg">
-                          SYNOX-{vault.id.toString().substring(0, 3)}
+                          ARYWO-{vault.id.toString().substring(0, 3)}
                         </div>
                       </div>
                     </div>

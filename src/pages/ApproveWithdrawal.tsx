@@ -131,7 +131,7 @@ export default function ApproveWithdrawal() {
           <div className="flex items-center justify-center mb-4">
             <img 
               src={darkMode ? "/logo-blanc.png" : "/logo-noir.png"} 
-              alt="SYNOX Logo" 
+              alt="ARYWO Logo" 
               className="h-16 w-auto"
             />
           </div>
@@ -273,7 +273,7 @@ export default function ApproveWithdrawal() {
                   onClick={() => navigate('/login')}
                   className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-poly font-bold hover:from-blue-600 hover:to-blue-700 transition-all duration-200"
                 >
-                  Retour à SYNOX
+                  Retour à ARYWO
                 </button>
               </>
             )}
@@ -336,7 +336,7 @@ export default function ApproveWithdrawal() {
         {/* Footer */}
         <div className="text-center mt-8">
           <p className={`text-sm ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-            © 2025 SYNOX. Tous droits réservés.
+            © 2025 ARYWO. Tous droits réservés.
           </p>
         </div>
       </div>

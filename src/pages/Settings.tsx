@@ -484,7 +484,7 @@ export default function Settings({ onLogout }: SettingsProps) {
             <div className={`p-6 rounded-2xl border ${cardClasses}`}>
               <h3 className="font-poly font-bold text-lg mb-4">Exporter les données</h3>
               <p className={`mb-4 ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Téléchargez une copie de toutes vos données SYNOX
+                Téléchargez une copie de toutes vos données ARYWO
               </p>
               <button className="flex items-center px-6 py-3 bg-blue-500 text-white rounded-xl font-poly font-bold hover:bg-blue-600 transition-colors">
                 <Download className="w-5 h-5 mr-2" />
@@ -530,7 +530,7 @@ export default function Settings({ onLogout }: SettingsProps) {
             Paramètres
           </h1>
           <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
-            Personnalisez votre expérience SYNOX
+            Personnalisez votre expérience ARYWO
           </p>
         </div>
 
