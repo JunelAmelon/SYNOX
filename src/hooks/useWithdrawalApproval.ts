@@ -336,7 +336,7 @@ export const useWithdrawalApproval = () => {
           type: 'Remboursement',
           userId: requestData.userId,
           vaultId: requestData.vaultId,
-          reference: `Remboursement Kkiapay - ${requestData.reason}`,
+          reference: `Retrait - ${requestData.reason}`,
           withdrawalRequestId: requestId,
           originalTransactionId: latestTransaction.id
         });
