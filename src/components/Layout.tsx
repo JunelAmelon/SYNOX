@@ -277,7 +277,7 @@ export default function Layout({ children, onLogout }: LayoutProps) {
                     <a href="#" className={`text-sm transition-colors ${
                       darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'
                     }`}>
-                      Aide & Support
+                      Aide & support
                     </a>
                     <a href="#" className={`text-sm transition-colors ${
                       darkMode ? 'text-gray-400 hover:text-white' : 'text-gray-600 hover:text-gray-900'

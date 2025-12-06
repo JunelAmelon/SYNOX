@@ -767,7 +767,7 @@ return (
 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
 <div>
 <h1 className="text-3xl sm:text-4xl font-poly font-bold mb-2">
-Mes Coffres d'Épargne
+Mes coffres d'épargne
 </h1>
 <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
 Gérez vos objectifs d'épargne et suivez vos progrès
@@ -778,7 +778,7 @@ onClick={() => setShowCreateModal(true)}
 className="flex items-center px-6 py-3 bg-gradient-to-r from-amber-400 to-amber-500 text-black rounded-xl font-poly font-bold hover:from-amber-500 hover:to-amber-600 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 mt-4 sm:mt-0"
 >
 <Plus className="w-5 h-5 mr-2" />
-Nouveau Coffre
+Nouveau coffre
 </button>
 </div>
 

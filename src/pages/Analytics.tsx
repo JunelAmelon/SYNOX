@@ -111,7 +111,7 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
             <div>
               <h1 className="text-3xl sm:text-4xl font-poly font-bold mb-2">
-                Analyses & Statistiques
+                Analyses & statistiques
               </h1>
               <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                 Suivez vos performances d'épargne et optimisez vos stratégies
@@ -240,7 +240,7 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
           {/* Monthly Performance Chart */}
           <div className={`rounded-2xl p-6 border ${cardClasses}`}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-poly font-bold">Performance Mensuelle</h2>
+              <h2 className="text-xl font-poly font-bold">Performance mensuelle</h2>
               <BarChart3 className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
             </div>
             
@@ -280,7 +280,7 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
           {/* Category Breakdown */}
           <div className={`rounded-2xl p-6 border ${cardClasses}`}>
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-poly font-bold">Répartition par Catégorie</h2>
+              <h2 className="text-xl font-poly font-bold">Répartition par catégorie</h2>
               <PieChart className={`w-5 h-5 ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
             </div>
             
@@ -313,13 +313,13 @@ export default function Analytics({ onLogout }: AnalyticsProps) {
 
         {/* Insights & Recommendations */}
         <div className={`rounded-2xl p-6 border ${cardClasses}`}>
-          <h2 className="text-xl font-poly font-bold mb-6">Insights & Recommandations</h2>
+          <h2 className="text-xl font-poly font-bold mb-6">Insights & recommandations</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className={`p-4 rounded-xl ${darkMode ? 'bg-emerald-900/20 border border-emerald-800' : 'bg-emerald-50 border border-emerald-200'}`}>
               <div className="flex items-center mb-3">
                 <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mr-2" />
-                <h3 className="font-poly font-bold text-emerald-700 dark:text-emerald-300">Excellente Performance</h3>
+                <h3 className="font-poly font-bold text-emerald-700 dark:text-emerald-300">Excellente performance</h3>
               </div>
               <p className={`text-sm ${darkMode ? 'text-emerald-200' : 'text-emerald-700'}`}>
                 Votre coffre voyage dépasse les objectifs de 25%. Continuez sur cette lancée !

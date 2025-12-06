@@ -136,7 +136,7 @@ export default function ApproveWithdrawal() {
             />
           </div>
           <h1 className="text-3xl font-poly font-bold mb-2">
-            Approbation de Retrait
+            Approbation de retrait
           </h1>
           <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
             Votre approbation est requise pour autoriser ce retrait

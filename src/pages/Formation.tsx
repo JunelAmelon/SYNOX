@@ -245,7 +245,7 @@ export default function Formation({ onLogout }: FormationProps) {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
             <div>
               <h1 className="text-3xl sm:text-4xl font-poly font-bold mb-2">
-                Centre de Formation
+                Centre de formation
               </h1>
               <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                 Développez vos compétences financières avec nos formations expertes

@@ -135,7 +135,7 @@ const cardClasses = darkMode
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
             <div>
               <h1 className="text-3xl sm:text-4xl font-poly font-bold mb-2">
-                Historique des Transactions
+                Historique des transactions
               </h1>
               <p className={`text-lg ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
                 Suivez tous vos mouvements financiers en détail
@@ -283,7 +283,7 @@ const cardClasses = darkMode
         {/* Transactions List */}
         <div className={`rounded-2xl border ${cardClasses}`}>
           <div className="p-6 border-b border-gray-300 dark:border-gray-600">
-            <h2 className="text-xl font-poly font-bold">Transactions Récentes</h2>
+            <h2 className="text-xl font-poly font-bold">Transactions récentes</h2>
           </div>
           
           <div className="divide-y divide-gray-300 dark:divide-gray-600">
