@@ -145,14 +145,14 @@ export default function Layout({ children, onLogout }: LayoutProps) {
             >
               {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
-            <Link 
+       { /* <Link 
               to="/notifications"
               className={`p-2.5 rounded-xl transition-all duration-300 ${
                 darkMode ? 'text-gray-400 hover:text-white hover:bg-gray-700' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
               }`}
             >
               <Bell className="w-5 h-5" />
-            </Link>
+            </Link> */ }
             <Link
               className="hidden sm:block"
               to="/settings"
