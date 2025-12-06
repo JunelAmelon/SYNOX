@@ -94,15 +94,15 @@ export default function AuthLayout({ children, title, subtitle, currentPage }: A
           </div>
           <div className="flex items-center">
             <div className="w-8 h-8 bg-amber-400 rounded-full flex items-center justify-center mr-3">
-              <span className="text-xs font-poly font-bold text-white">SM</span>
+              <span className="text-xs font-poly font-bold text-white">A</span>
             </div>
             <div>
               <p className={`text-sm font-poly font-semibold transition-colors duration-300 ${
                 darkMode ? 'text-white' : 'text-gray-900'
-              }`}>Sophie M.</p>
+              }`}>Alexandra</p>
               <p className={`text-xs transition-colors duration-300 ${
                 darkMode ? 'text-gray-400' : 'text-gray-500'
-              }`}>Entrepreneur, Paris</p>
+              }`}>Etudiante, Paris</p>
             </div>
           </div>
         </div>
