@@ -131,9 +131,9 @@ export default function Settings({ onLogout }: SettingsProps) {
   const tabs = [
     { id: 'profile', label: 'Profil', icon: User },
     { id: 'security', label: 'Sécurité', icon: Shield },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
+   /*  { id: 'notifications', label: 'Notifications', icon: Bell },*/ 
     { id: 'appearance', label: 'Apparence', icon: Palette },
-    { id: 'privacy', label: 'Confidentialité', icon: Lock },
+   /* { id: 'privacy', label: 'Confidentialité', icon: Lock },*/
     { id: 'account', label: 'Compte', icon: SettingsIcon },
   ];
 
